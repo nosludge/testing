@@ -1,0 +1,18 @@
+# SPDX-FileCopyrightText: © 2024 nosludge <https://github.com/nosludge>
+# SPDX-FileContributor: szymonmaszke <github@maszke.co>
+#
+# SPDX-License-Identifier: Apache-2.0
+
+---
+cff-version: 1.2.0
+abstract: Testing
+message: If you use this software, please cite it as below.
+authors:
+  - family-names: nosludge
+url: https://github.com/testing/nosludge
+repository-code: https://github.com/testing/nosludge
+title: testing
+date-released: 2025-02-25
+license: Apache-2.0
+keywords:
+  - python
