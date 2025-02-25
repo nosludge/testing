@@ -1,0 +1,65 @@
+# SPDX-FileCopyrightText: © 2024 nosludge <https://github.com/nosludge>
+# SPDX-FileContributor: szymonmaszke <github@maszke.co>
+#
+# SPDX-License-Identifier: Apache-2.0
+
+---
+name: "PDM Setup"
+description: "Setup PDM with exact match caching support."
+inputs:
+  pdm-install:
+    description: >
+      Additional flags (as string) to pass to the PDM installation command.
+      These will be used as cache-key.
+    required: false
+    default: ""
+  python-version:
+    description: >
+      Version range or exact version of a Python version to use,
+      using SemVer's version range syntax.
+    required: false
+    #
+    #           DO NOT EDIT UNTIL end marker
+    #
+    # [[[cog
+    # import cog
+    # import cogeol
+    #
+    # cycle = cogeol.scientific()[-1]["cycle"]
+    # cog.out(f'    default: "{cycle}"')
+    # ]]]
+    default: "3.11"
+    # [[[end]]]
+
+runs:
+  using: "composite"
+  steps:
+    - name: "Save installation options for cache key"
+      shell: "bash"
+      env:
+        PDM_INSTALL: "${{ inputs.pdm-install }}"
+      run: >
+        echo "${PDM_INSTALL}" >> deps.groups
+    - name: "Setup Caching PDM"
+      id: "setup-pdm"
+      uses: "pdm-project/setup-pdm@b2472ca4258a9ea3aee813980a0100a2261a42fc"  # v4.2.0
+      with:
+        python-version: "${{ inputs.python-version }}"
+        cache-dependency-path: |
+          pdm.lock
+          deps.groups
+        cache-restore-exact-match: true
+    # Change command below to pdm setup-ci?
+    - name: "Install dependencies"
+      shell: "bash"
+      env:
+        PDM_INSTALL: "${{ inputs.pdm-install }}"
+      if: >
+        steps.setup-pdm.outputs.cache-hit != 'true'
+      run: >
+        pdm install "${PDM_INSTALL}"
+    - name: "Cleanup pdm-install file"
+      shell: "bash"
+      run: >
+        rm deps.groups
+...

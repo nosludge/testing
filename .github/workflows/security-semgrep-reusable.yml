@@ -1,0 +1,75 @@
+# SPDX-FileCopyrightText: © 2024 nosludge <https://github.com/nosludge>
+# SPDX-FileContributor: szymonmaszke <github@maszke.co>
+#
+# SPDX-License-Identifier: Apache-2.0
+
+---
+name: "Security Semgrep Reusable"
+
+on:
+  workflow_call:
+    inputs:
+      name:
+        description: "Name of the artifact (default: '' - no artifact upload)"
+        type: "string"
+        default: ""
+      sarif:
+        description: "Upload SARIF file to CodeQL"
+        type: "boolean"
+        default: false
+      continue-on-error:
+        description: "Whether to continue on error"
+        type: "boolean"
+        default: false
+      file:
+        description: "Name/path of the created SARIF file"
+        type: "string"
+        default: "semgrep.sarif"
+
+permissions: {} # yamllint disable-line rule:braces
+
+jobs:
+  security-semgrep-reusable:
+    name: "Security Semgrep Reusable"
+    timeout-minutes: 10
+    runs-on: "ubuntu-latest"
+    permissions:
+      # Required to upload SARIF file to CodeQL.
+      # See: https://github.com/github/codeql-action/issues/2117
+      actions: "read"
+      # Writing security events to upload SARIF file to security tab
+      security-events: "write"
+      # Only need to read contents
+      contents: "read"
+    steps:
+      - name: "Harden Runner"
+        # yamllint disable rule:line-length
+        uses: "step-security/harden-runner@17d0e2bd7d51742c71671bd19fa12bdc9d40a3d6" # v2.8.1
+        # yamllint enable rule:line-length
+        with:
+          egress-policy: "audit"
+      - name: "Checkout repository"
+        # yamllint disable rule:line-length
+        uses: "actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332" # v4.1.7
+        # yamllint enable rule:line-length
+        with:
+          persist-credentials: false
+      - name: "Setup PDM"
+        # yamllint disable rule:line-length
+        uses: "./.github/actions/pdm-setup"
+        # yamllint enable rule:line-length
+        with:
+          # Sigstore, python-semantic-release etc.
+          pdm-install: "-G security --no-self"
+      - name: "Run Semgrep"
+        env:
+          SEMGREP_FILE: "${{ inputs.file }}"
+        run: >
+          pdm run check-security --sarif-output="${SEMGREP_FILE}"
+      - name: "Upload files"
+        uses: "./.github/actions/sarif-upload"
+        with:
+          file: "${{ inputs.file }}"
+          name: "${{ inputs.name }}"
+          sarif: "${{ inputs.sarif }}"
+...

@@ -1,0 +1,202 @@
+[build-system]
+requires = ["pdm-backend"]
+build-backend = "pdm.backend"
+
+[project]
+requires-python = ">=3.10"
+name = "{{cookiecutter.repository}}"
+description = "..."
+authors = [
+    {name = ""},
+]
+maintainers = [
+    {name = "{{cookiecutter.repository_owner}}"},
+]
+readme = "README.md"
+
+license = {text = "LICENSE.md"}
+# Full list of classifiers: https://pypi.org/classifiers/
+classifiers = [
+    "Development Status :: 1 - Planning",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "Topic :: Software Development :: Libraries",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+]
+dynamic = ["version"]
+
+###############################################################################
+#
+#                              CORE DEPENDENCIES
+#
+###############################################################################
+
+dependencies = []
+
+###############################################################################
+#
+#                             OPTIONAL DEPENDENCIES
+#
+###############################################################################
+
+[tool.pdm]
+distribution = true
+plugins = [
+    "pdm-matrix",
+]
+
+[tool.pdm.dev-dependencies]
+test = [
+    "pytest<9.0.0,>=8.0.0",
+    "pytest-cov<6.0.0,>=5.0.0",
+    "pytest-html<5.0.0,>=4.0.0",
+    "pytest-pretty-terminal<2.0.0,>=1.1.0",
+]
+check-python-static = [
+    # Python
+    "ruff<1.0.0,>=0.4.0", # src, test, pyproject, pdm.lock no setup
+    "pytype<2025.0.0,>=2024.0.0; python_version < \"3.11\" and python_version >= \"3.8\"", # src, test no setup
+    "codespell<3.0.0,>=2.3.0", # src, test no setup
+    # Documentation
+    "interrogate<2.0.0,>=1.5.0", # src, test, pdm.lock no setup
+    # Copyright in files (doesn't need root)
+    # "insertie<1.0.0,>=0.0.1", # src, test, pdm.lock no setup
+]
+
+check-yaml = [
+    # YAML
+    "yamllint<2.0.0,>=1.28.0",
+]
+
+check-pyproject = [
+    # Pyproject (only match on pyproject)
+    "validate-pyproject<1.0.0,>=0.18",
+    "pyproject-fmt<3.0.0,>=2.1.3",
+]
+check-citations= [
+    # Citations (only match on CITATION.cff)
+    "cffconvert<3.0.0,>=2.0.0",
+]
+check-markdown = [
+    # Define deadlink correctly
+    "deadlink<1.0.0,>=0.5.0",
+    # Markdown linting
+    "pymarkdownlnt<1.0.0,>=0.9.21",
+]
+docs = [
+    "mkdocs<2.0.0,>=1.3.0",
+    "mkdocs-material<10.0.0,>=9.0.0",
+    "mkdocstrings<1.0.0,>=0.25.0",
+    "mkdocstrings-python<2.0.0,>=1.0.0",
+    "mkdocs-literate-nav<1.0.0,>=0.6.0",
+    "mkdocs-section-index<1.0.0,>=0.3.4",
+    "mkdocs-gen-files<1.0.0,>=0.5.0",
+    "mkdocs-minify-plugin<1.0.0,>=0.8.0",
+    "mkdocs-git-revision-date-localized-plugin>=1",
+    "mike<3.0.0,>=2.1.2",
+]
+hooks = [
+    "pre-commit<4.0.0,>=3.0.0",
+]
+
+[tool.pdm.build]
+includes = []
+
+[tool.pdm.scripts]
+quick-test = "pytest --pretty --cov=src --cov-fail-under=100 --cov-report=term-missing test"
+full-test = { shell = "{pdm} matrix ci pytest --pretty --cov=src --cov-fail-under=100 --cov-report=term-missing test" }
+check = { composite = [
+    "validate-pyproject",
+    "ruff check .",
+    "codespell --count .",
+]}
+
+[tool.pdm.matrix.ci.variables]
+python = ["3.10", "3.11", "3.12"]
+
+###############################################################################
+#
+#                                FIX SETTINGS
+#
+###############################################################################
+
+[tool.ruff]
+target-version = "py39"
+select = [
+  "ALL",
+]
+
+ignore = [
+  "ISC001", # simplify implicit str concatenation (ruff-format recommended)
+  "ANN101",
+  "ANN102",
+  "ANN401",
+]
+
+output-format = "grouped"
+
+show-fixes = true
+show-source = true
+src = ["src", "test"]
+
+[tool.ruff.format]
+docstring-code-format = true
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101"]
+
+[tool.ruff.lint.flake8-annotations]
+suppress-dummy-args = true
+allow-star-arg-any = true
+
+[tool.ruff.lint.flake8-bandit]
+check-typed-exception = true
+
+[tool.ruff.lint.flake8-builtins]
+builtins-ignorelist = ["id"]
+
+[tool.ruff.lint.flake8-pytest-style]
+parametrize-values-type = "tuple"
+
+[tool.ruff.pydocstyle]
+convention = "google"
+
+[tool.ruff.pylint]
+max-args = 6
+max-branches = 6
+max-returns = 6
+max-statements = 20
+
+[tool.pyproject-fmt]
+column_width = 80
+
+###############################################################################
+#
+#                               COVERAGE SETTINGS
+#
+###############################################################################
+
+[tool.coverage.run]
+branch = true
+relative_files = true
+
+###############################################################################
+#
+#                             DOCS COVERAGE SETTINGS
+#
+###############################################################################
+
+[tool.interrogate]
+verbose = 2
+fail-under = 100
+exclude = [
+  "docs",
+  "build",
+  "test",
+]

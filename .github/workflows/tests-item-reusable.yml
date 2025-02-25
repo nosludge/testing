@@ -1,0 +1,119 @@
+# SPDX-FileCopyrightText: © 2024 nosludge <https://github.com/nosludge>
+# SPDX-FileContributor: szymonmaszke <github@maszke.co>
+#
+# SPDX-License-Identifier: Apache-2.0
+
+---
+name: "Tests Item Reusable"
+
+on:
+  workflow_call:
+    inputs:
+      python-version:
+        description: "Python version used to run tests"
+        type: "string"
+        #
+        #           DO NOT EDIT UNTIL end marker
+        #
+        # [[[cog
+        # import cog
+        # import cogeol
+        #
+        # cycle = cogeol.scientific()[-1]["cycle"]
+        # cog.out(f'        default: "{cycle}"')
+        # ]]]
+        default: "3.11"
+        # [[[end]]]
+      os:
+        description: "Operating system to cache on"
+        type: "string"
+        default: "ubuntu-latest"
+      retention-days:
+        description: "Number of days to keep the artifact"
+        type: "number"
+        default: 5
+      timeout-minutes:
+        description: "Maximum time for the job to run"
+        type: "number"
+        default: 180
+      upload-to-release:
+        description: "Whether to upload test attestation to release"
+        type: "boolean"
+        default: false
+
+permissions: {} # yamllint disable-line rule:braces
+
+jobs:
+  tests-item-reusable:
+    name: >
+      Tests | ${{ inputs.os }} | python-${{ inputs.python-version }}
+    runs-on: "${{ inputs.os }}"
+    timeout-minutes: "${{ inputs.timeout-minutes }}"
+    permissions:
+      contents: "read"
+
+    steps:
+      - name: "Harden Runner"
+        # yamllint disable rule:line-length
+        uses: "step-security/harden-runner@17d0e2bd7d51742c71671bd19fa12bdc9d40a3d6" # v2.8.1
+        # yamllint enable rule:line-length
+        with:
+          disable-sudo: true
+          egress-policy: "block"
+          allowed-endpoints: >
+            api.github.com:443
+            files.pythonhosted.org:443
+            github.com:443
+            pdm-project.org:443
+            pdm.fming.dev:443
+            pypi.org:443
+            raw.githubusercontent.com:443
+      - name: "Checkout repository"
+        # yamllint disable rule:line-length
+        uses: "actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332" # v4.1.7
+        # yamllint enable rule:line-length
+        with:
+          sparse-checkout: |
+            LICENSE.md
+            README.md
+            src/**
+            tests/**
+            .github/actions/setup-pdm
+            pyproject.toml
+            pdm.lock
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
+      - name: "Setup PDM"
+        uses: "./.github/actions/pdm-setup"
+        with:
+          python-version: "${{ inputs.python-version }}"
+          pdm-install: "-G:all --without
+                        dev-python,\
+                        dev-yaml,\
+                        dev-markdown,\
+                        dev-ini,\
+                        dev-pyproject,\
+                        dev-citation,\
+                        dev-security,\
+                        dev-docs,\
+                        dev-legal,\
+                        dev-pre-commit,\
+                        dev-commit,\
+                        dev-generation,\
+                        dev-workflows"
+      - name: "Run PR test suite"
+        shell: "bash"
+        run: >
+          pdm run test --html=.report.html --self-contained-html
+      - name: "Upload coverage data"
+        # yamllint disable rule:line-length
+        uses: "actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808" # v4.3.3
+        # yamllint enable rule:line-length
+        with:
+          # yamllint disable rule:line-length
+          name: >
+            python-coverage-${{ inputs.os }}-${{ inputs.python-version }}-${{ github.sha }}
+          # yamllint enable rule:line-length
+          path: ".coverage*"
+          retention-days: "${{ inputs.retention-days }}"
+...

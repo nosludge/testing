@@ -1,0 +1,62 @@
+# SPDX-FileCopyrightText: © 2024 nosludge <https://github.com/nosludge>
+# SPDX-FileContributor: szymonmaszke <github@maszke.co>
+#
+# SPDX-License-Identifier: Apache-2.0
+
+---
+name: "Tests Reusable"
+
+on:
+  workflow_call:
+    inputs:
+      upload-to-release:
+        description: "Whether to upload coverage to release"
+        type: "boolean"
+        default: false
+
+permissions: {} # yamllint disable-line rule:braces
+
+jobs:
+  tests-reusable:
+    strategy:
+      matrix:
+        python:
+          #
+          #           DO NOT EDIT UNTIL end marker
+          #
+          # [[[cog
+          # import cog
+          # import cogeol
+          #
+          # for version in reversed(cogeol.scientific()):
+          #     cycle = version['cycle']
+          #     cog.outl(f'          - "{cycle}"')
+          # ]]]
+          - "3.11"
+          - "3.12"
+          - "3.13"
+          # [[[end]]]
+        os:
+          - "ubuntu-latest"
+          - "macos-latest"
+          - "windows-latest"
+    name: >
+      Tests | ${{ matrix.os }} | python-${{ matrix.python }}
+    permissions:
+      contents: "read"
+    uses: "./.github/workflows/tests-item-reusable.yml"
+    with:
+      python-version: "${{ matrix.python }}"
+      os: "${{ matrix.os }}"
+      # Currently unused
+      upload-to-release: "${{ inputs.upload-to-release }}"
+
+  coverage-reusable:
+    name: "Coverage Reusable"
+    needs: "tests-reusable"
+    permissions:
+      contents: "read"
+    uses: "./.github/workflows/coverage-reusable.yml"
+    with:
+      upload-to-release: "${{ inputs.upload-to-release }}"
+...

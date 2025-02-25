@@ -1,0 +1,53 @@
+# SPDX-FileCopyrightText: © 2024 nosludge <https://github.com/nosludge>
+# SPDX-FileContributor: szymonmaszke <github@maszke.co>
+#
+# SPDX-License-Identifier: Apache-2.0
+
+---
+name: "Editorconfig Enforcer"
+
+on:
+  pull_request:
+    branches:
+      - "main"
+  merge_group:
+    types:
+      - "checks_requested"
+
+permissions: {} # yamllint disable-line rule:braces
+
+concurrency:
+  group: >
+    ${{ github.workflow_ref }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  editorconfig-enforcer:
+    timeout-minutes: 30
+    permissions:
+      contents: "read"
+    name: "Editorconfig Enforcer"
+    runs-on: "ubuntu-latest"
+    steps:
+      - name: "Harden Runner"
+        # yamllint disable rule:line-length
+        uses: "step-security/harden-runner@5c7944e73c4c2a096b17a9cb74d65b6c2bbafbde" # v2.9.1
+        # yamllint enable rule:line-length
+        with:
+          egress-policy: "audit"
+      - name: "Checkout repository"
+        # yamllint disable rule:line-length
+        uses: "actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332" # v4.1.7
+        # yamllint enable rule:line-length
+        with:
+          persist-credentials: false
+          # Exclude license files from the checkout
+          sparse-checkout: |
+            !LICENSE*
+      - name: "Check editorconfig compliance"
+        # yamllint disable rule:line-length
+        uses: "editorconfig-checker/action-editorconfig-checker@12084b77c2581eaa7b3f5ab3c0a6ee2e9b9f4459"
+        # yamllint enable rule:line-length
+        with:
+          go-version: "stable"
+...

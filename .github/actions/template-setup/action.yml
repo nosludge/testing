@@ -1,0 +1,121 @@
+# SPDX-FileCopyrightText: © 2024 nosludge <https://github.com/nosludge>
+# SPDX-FileContributor: szymonmaszke <github@maszke.co>
+#
+# SPDX-License-Identifier: Apache-2.0
+
+---
+name: "Template Setup"
+description: "Setup opennudge/pynudge template"
+
+runs:
+  using: "composite"
+  steps:
+    - name: "Setup Python"
+      # yamllint disable rule:line-length
+      uses: "actions/setup-python@82c7e631bb3cdc910f68e0081d67478d79c6982d" # v5.1.0
+      # yamllint enable rule:line-length
+      with:
+        python-version: "3.x"
+    - name: "Install cookiecutter"
+      shell: "bash"
+      run: >
+        pip install cookiecutter
+    - name: "Save directory for cookiecutter run"
+      shell: "bash"
+      id: "cookiecutter_directory"
+      # Normalize the path to avoid issues with missing directory
+      run: >
+        echo wd="$(realpath "$(pwd)"/..)" >> "${GITHUB_OUTPUT}"
+    - name: "Create cookiecutter.json"
+      shell: "bash"
+      env:
+        REPOSITORY: "${{ github.event.repository.name }}"
+        REPOSITORY_OWNER: "${{ github.repository_owner }}"
+        DESCRIPTION: "${{ github.event.repository.description }}"
+      id: "cookiecutter_file"
+      # \" is used to force the value to be a string
+      run: >
+        ./template/create_cookiecutter_json.sh
+        ../cookiecutter.json
+        repository "\"${REPOSITORY}\""
+        repository_owner "\"${REPOSITORY_OWNER}\""
+        description "\"${DESCRIPTION}\""
+    - name: "Setup repository"
+      shell: "bash"
+      env:
+        REPOSITORY: "${{ github.event.repository.name }}"
+      # yamllint disable rule:line-length
+      run: |
+        shopt -s dotglob nullglob
+        mv docs temporary_docs
+        mv ./skeleton/* ./
+        mv ./to_github/* ./.github/
+        mv temporary_docs docs/template
+        rm -rf skeleton to_github
+        mv ../"${REPOSITORY}" ../"{{ cookiecutter.repository }}"
+      # yamllint enable rule:line-length
+    - name: "Create repo from template"
+      shell: "bash"
+      working-directory: "${{ steps.cookiecutter_directory.outputs.wd }}"
+      run: >
+        cookiecutter --verbose --no-input .
+    # We can now work in standard working-directory
+    # Cookiecutter recreated original repository at the same location
+    - name: "Create .gitignore header (and additional files)"
+      shell: "bash"
+      # REUSE-IgnoreStart
+      run: |
+        echo '# SPDX-FileCopyrightText: © 2025 GitHub <https://github.com>
+        #
+        # SPDX-License-Identifier: CC0-1.0
+
+        .python-version
+        ' > .gitignore
+      # REUSE-IgnoreEnd
+    - name: "Add cliff changelog↴"
+      shell: "bash"
+      run: |
+        cat cliff.toml >> pyproject.toml
+    - name: "Add the latest Python .gitignore"
+      shell: "bash"
+      run: >
+        curl
+        https://raw.githubusercontent.com/github/gitignore/main/Python.gitignore
+        >> .gitignore
+    - name: "Link documentation files to the /docs"
+      shell: "bash"
+      working-directory: "./docs"
+      # yamllint disable rule:indentation
+      run: |
+        files=(
+          "ADOPTERS.md"
+          "ANNOUNCEMENTS.md"
+          "CODE_OF_CONDUCT.md"
+          "CHANGELOG.md"
+          "CONTRIBUTING.md"
+          "DCO.md"
+          "GOVERNANCE.md"
+          "LICENSE.md"
+          "ROADMAP.md"
+          "SECURITY.md"
+          "SECURITY-DEPENDENCY.md"
+          "SECURITY-SELF-ASSESSMENT.md"
+        )
+
+        for file in "${files[@]}"
+        do
+          ln -s "../${file}" "${file}"
+        done
+
+        # Specific linking
+        ln -s "../README.md" "index.md"
+        # Template linking
+        ln -s "../.github/workflows/README.md" "template/github-actions.md"
+      # yamllint enable rule:indentation
+    - name: "Remove template files"
+      shell: "bash"
+      run: >
+        rm -rf
+        template
+        .github/workflows/template-*.yml
+...

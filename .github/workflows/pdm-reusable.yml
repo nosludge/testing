@@ -1,0 +1,74 @@
+# SPDX-FileCopyrightText: © 2024 nosludge <https://github.com/nosludge>
+# SPDX-FileContributor: szymonmaszke <github@maszke.co>
+#
+# SPDX-License-Identifier: Apache-2.0
+
+---
+name: "PDM Reusable"
+
+on:
+  workflow_call:
+    inputs:
+      prefix:
+        description: "Prefix for the concurrency group"
+        required: true
+        type: "string"
+      checkout:
+        description: "Additional files to checkout"
+        required: false
+        type: "string"
+      timeout-minutes:
+        description: "Timeout in minutes"
+        required: false
+        type: "number"
+        default: 30
+
+permissions: {} # yamllint disable-line rule:braces
+
+jobs:
+  pdm-reusable:
+    name: "PDM Reusable"
+    permissions:
+      contents: "read"
+    timeout-minutes: "${{ inputs.timeout-minutes }}"
+    runs-on: "ubuntu-latest"
+    steps:
+      - name: "Harden Runner"
+        # yamllint disable rule:line-length
+        uses: "step-security/harden-runner@17d0e2bd7d51742c71671bd19fa12bdc9d40a3d6" # v2.8.1
+        # yamllint enable rule:line-length
+        with:
+          disable-sudo: true
+          egress-policy: "block"
+          allowed-endpoints: >
+            api.github.com:443
+            files.pythonhosted.org:443
+            github.com:443
+            pdm-project.org:443
+            pdm.fming.dev:443
+            pypi.org:443
+            raw.githubusercontent.com:443
+      - name: "Checkout repository"
+        # yamllint disable rule:line-length
+        uses: "actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332" # v4.1.7
+        # yamllint enable rule:line-length
+        with:
+          sparse-checkout: |
+            README.md
+            LICENSE.md
+            .github/actions/pdm-setup
+            pyproject.toml
+            pdm.lock
+            ${{ inputs.checkout }}
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
+      - name: "Setup PDM"
+        uses: "./.github/actions/pdm-setup"
+        with:
+          pdm-install: "-G --no-self ${{ inputs.prefix }}"
+      - name: "Run specified command"
+        env:
+          COMMAND: "check-${{ inputs.prefix }}"
+        run: >
+          pdm run "${COMMAND}"
+...

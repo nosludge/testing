@@ -1,0 +1,90 @@
+# SPDX-FileCopyrightText: © 2024 nosludge <https://github.com/nosludge>
+# SPDX-FileContributor: szymonmaszke <github@maszke.co>
+#
+# SPDX-License-Identifier: Apache-2.0
+
+---
+name: "Attest Package Reusable"
+
+on:
+  workflow_call:
+    inputs:
+      dist:
+        description: >
+          Name of the dist to download and upload to repository
+        type: "string"
+        default: "dist"
+      repository-url:
+        description: >
+          URL of the repository to upload the package to
+        type: "string"
+        default: "https://upload.pypi.org/legacy/"
+      endpoints:
+        description: >
+          List of allowed endpoints passed to Harden Runner
+        type: "string"
+        default: |
+          pypi.org:443
+          files.pythonhosted.org:443
+      skip-existing:
+        description: >
+          Skip uploading the package if it already exists in the repository
+        type: "boolean"
+        default: true
+      attestations:
+        description: >
+          Whether to create attestations for the uploaded package
+        type: "boolean"
+        default: true
+      upload-release:
+        description: >
+          Whether to upload the attestations to a release
+        type: "boolean"
+        default: true
+
+permissions: {} # yamllint disable-line rule:braces
+
+jobs:
+  # This cache is any OS + multiple Python versions
+  attest-package-reusable:
+    name: "Attest Package Reusable"
+    permissions: "write-all"
+    runs-on: "ubuntu-latest"
+    steps:
+      - uses: "GitHubSecurityLab/actions-permissions/monitor@v1"
+      - name: "Harden Runner"
+        # yamllint disable rule:line-length
+        uses: "step-security/harden-runner@17d0e2bd7d51742c71671bd19fa12bdc9d40a3d6" # v2.8.1
+        # yamllint enable rule:line-length
+        with:
+          disable-sudo: "true"
+          egress-policy: "audit"
+          # egress-policy: block
+          # allowed-endpoints: ${{ inputs.endpoints }}
+      - name: "Download artifacts"
+        # yamllint disable rule:line-length
+        uses: "actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16" # v4.1.8
+        with:
+          name: "${{ inputs.dist }}"
+          path: "${{ inputs.dist }}/"
+      - name: "Upload python package"
+        # yamllint disable rule:line-length
+        uses: "pypa/gh-action-pypi-publish@67339c736fd9354cd4f8cb0b744f2b82a74b5c70" # v1.12.3
+        # yamllint enable rule:line-length
+        id: "upload-package"
+        with:
+          repository-url: "${{ inputs.repository-url }}"
+          packages-dir: "${{ inputs.dist }}"
+          skip-existing: "${{ inputs.skip-existing }}"
+          attestations: "${{ inputs.attestations }}"
+          print-hash: true
+      - name: "Upload to release"
+        if: >
+          inputs.upload-release
+        env:
+          GH_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+          TAG_NAME: "${{ github.event.release.tag_name }}"
+          DIST: "${{ inputs.dist }}"
+        run: >
+          gh release upload "${TAG_NAME}" "${DIST}"/*
+...

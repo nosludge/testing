@@ -1,0 +1,23 @@
+# SPDX-FileCopyrightText: © 2024 nosludge <https://github.com/nosludge>
+# SPDX-FileContributor: szymonmaszke <github@maszke.co>
+#
+# SPDX-License-Identifier: Apache-2.0
+
+---
+name: "Ini Reusable"
+
+on:
+  workflow_call:
+
+permissions: {} # yamllint disable-line rule:braces
+
+jobs:
+  ini-reusable:
+    name: "Citation Reusable"
+    permissions:
+      contents: "read"
+    uses: "./.github/workflows/pdm-reusable.yml"
+    with:
+      prefix: "citation"
+      checkout: "CITATION.cff"
+...

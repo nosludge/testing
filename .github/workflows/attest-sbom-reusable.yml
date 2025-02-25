@@ -1,0 +1,94 @@
+# SPDX-FileCopyrightText: © 2024 nosludge <https://github.com/nosludge>
+# SPDX-FileContributor: szymonmaszke <github@maszke.co>
+#
+# SPDX-License-Identifier: Apache-2.0
+
+---
+name: "Attest SBOM Reusable"
+
+on:
+  workflow_call:
+    inputs:
+      hash:
+        description: "A base64 encoded hashes"
+        type: "string"
+        required: true
+      sbom:
+        description: "Name of the SBOM of the artifact to attest"
+        type: "string"
+        required: true
+      retention-days:
+        description: "How many days to keep the artifact"
+        type: "number"
+        default: 90
+      upload-to-release:
+        description: "Upload to release"
+        type: "boolean"
+        default: true
+
+
+permissions: {} # yamllint disable-line rule:braces
+
+jobs:
+  attest-sbom-reusable:
+    name: "Attest SBOM Reusable"
+    permissions: "write-all"
+    runs-on: "ubuntu-latest"
+    env:
+      ATTESTATION_NAME: >
+        attestation-${{ inputs.sbom }}-${{ github.sha }}.json
+    steps:
+      - uses: "GitHubSecurityLab/actions-permissions/monitor@v1"
+      - name: "Harden Runner"
+        # yamllint disable rule:line-length
+        uses: "step-security/harden-runner@17d0e2bd7d51742c71671bd19fa12bdc9d40a3d6" # v2.8.1
+        # yamllint enable rule:line-length
+        with:
+          egress-policy: "audit"
+      - name: "Download artifacts"
+        # yamllint disable rule:line-length
+        uses: "actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16" # v4.1.8
+        with:
+          name: "${{ inputs.sbom }}-${{ github.sha }}"
+      - name: "Decode Hash"
+        id: "decode"
+        uses: "./.github/actions/decode"
+        with:
+          encoded: "${{ inputs.hash }}"
+      - name: "Attest SBOM"
+        # yamllint disable rule:line-length
+        uses: "actions/attest-sbom@cbfd0027ae731a5892db25ecd226930d7ffd19eb" # v2.1.0
+        # yamllint enable rule:line-length
+        id: "attestation"
+        with:
+          sbom-path: >
+            ${{ inputs.sbom }}-${{ github.sha }}.json
+          subject-checksums: >
+            ${{ steps.decode.outputs.decoded }}
+      - name: "Rename attestation"
+        env:
+          ATTESTATION_NAME: "${{ env.ATTESTATION_NAME }}"
+          BUNDLE_PATH: "${{ steps.attestation.outputs.bundle-path }}"
+        run: >
+          mv "${BUNDLE_PATH}" "${ATTESTATION_NAME}"
+      - name: "Upload SBOM attestation"
+        # yamllint disable rule:line-length
+        uses: "actions/upload-artifact@834a144ee995460fba8ed112a2fc961b36a5ec5a" # v4.3.6
+        # yamllint enable rule:line-length
+        with:
+          name: "attestation-${{ inputs.sbom }}"
+          path: "${{ env.ATTESTATION_NAME }}"
+          retention-days: "${{ inputs.retention-days }}"
+      - name: "Upload to release"
+        if: >
+          inputs.upload-to-release
+        env:
+          GH_TOKEN: "${{ github.token }}"
+          TAG_NAME: "${{ github.event.release.tag_name }}"
+          ATTESTATION_NAME: "${{ env.ATTESTATION_NAME }}"
+          BUNDLE_PATH: "${{ steps.attestation.outputs.bundle-path }}"
+        run: >
+          gh release upload "${TAG_NAME}"
+          "${ATTESTATION_NAME}"
+          "${BUNDLE_PATH}"
+...

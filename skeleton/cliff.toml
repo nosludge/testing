@@ -1,0 +1,202 @@
+###############################################################################
+#
+#                                   CHANGELOG
+#
+###############################################################################
+
+
+[tool.git-cliff.changelog]
+header = """
+"""
+# template for the changelog body
+# https://keats.github.io/tera/docs/#introduction
+body = """
+{%- macro remote_url() -%}
+  https://github.com/{{ remote.github.owner }}/{{ remote.github.repo }}
+{%- endmacro -%}
+
+{%- if version -%}
+  {% if previous.version %}
+    # [{{ version | trim_start_matches(pat="v") }}]({{ self::remote_url() }}/compare/{{ previous.version }}..{{ version }}) \
+    - {{ timestamp | date(format="%Y-%m-%d") }} \
+    ([vs HEAD]({{ self::remote_url() }}/compare/{{ version }}..HEAD))
+  {%- else -%}
+    # {{ version | trim_start_matches(pat="v") }} - {{ timestamp | date(format="%Y-%m-%d") }} \
+    ([vs HEAD]({{ self::remote_url() }}/compare/{{ version }}..HEAD))
+  {%- endif %}
+{%- else -%}
+# Untagged - {{ timestamp | date(format="%Y-%m-%d") }} \
+  ([vs HEAD]({{ self::remote_url() }}/compare/..HEAD))
+{%- endif %}
+
+__Commits by type__
+
+{% set total = commits | length -%}
+
+{%- set human = self::count_commits(commits=commits, bot=false) -%}
+{%- set bot = self::count_commits(commits=commits, bot=true) -%}
+
+{%- set python = self::count_commits(commits=commits, label="python") -%}
+{%- set other = self::count_commits(commits=commits, label="python", contains=false) -%}
+
+Total | Human | Bots | Python | Other
+:---: | :---: | :---:|  :---: | :---:
+{{ total }} | {{ human }} | {{ bot }} | {{ python }} | {{ other }}
+
+__Commits by labels__
+
+{% set security = self::count_commits(commits=commits, label="security") -%}
+{%- set tests = self::count_commits(commits=commits, label="tests") -%}
+{%- set legal = self::count_commits(commits=commits, label="legal") -%}
+{%- set docs = self::count_commits(commits=commits, label="docs") -%}
+{%- set actions = self::count_commits(commits=commits, label="actions") -%}
+{%- set deps = self::count_commits(commits=commits, label="deps") -%}
+{%- set config = self::count_commits(commits=commits, label="config") -%}
+
+Security | Tests | Legal | Docs | Actions | Config | Dependencies |
+  :---:  | :---: | :---: | :---:|  :---:  |  :---: |    :---:     |
+{{ security }} | {{ tests }} | {{ legal }} | {{ docs }} | {{ actions }} | {{ config }} | {{ deps }}
+
+{% set python_data = [python, "Python", true, get_env(name="PYTHON_PACKAGE_VERSION", default="")] -%}
+{%- set other_data = [other, "Other", false, ""] -%}
+{%- set data = [python_data, other_data] -%}
+
+{%- for item in data%}
+  {%- if item[0] != "0" -%}
+    ## {{ item[1] }} ({% if item[3] %}v{{ item[3] }}, {% endif %}{{ item[0] }} commits)
+    {{- self::display(
+      commits=commits | filter(attribute="breaking", value=true),
+      header="Breaking changes",
+      python=item[2],
+      display_group=true,
+    )-}}
+    {{- self::display(
+      commits=commits | filter(attribute="breaking", value=false) | filter(attribute="group", value="feat"),
+      header="Features",
+      python=item[2],
+    )-}}
+    {{- self::display(
+      commits=commits | filter(attribute="breaking", value=false) | filter(attribute="group", value="fix"),
+      header="Fixes",
+      python=item[2],
+    )-}}
+    {{- self::display(
+      commits=commits,
+      header="Bots",
+      python=item[2],
+      display_group=true,
+      bot=true,
+    )-}}
+  {% endif -%}
+{% endfor %}
+
+{%- macro count_commits(commits, label=false, bot="ignore", contains=true) -%}
+  {% set counter = 0 %}
+  {%- for commit in commits %}
+    {%- if
+      (
+        not label or
+        (
+          (contains and label in commit.github.pr_labels)
+          or
+          (not contains and label not in commit.github.pr_labels)
+        )
+      )
+      and
+      (
+        bot == "ignore"
+        or
+        (not bot and not "[bot]" in commit.author.name)
+        or
+        (bot and "[bot]" in commit.author.name)
+      )
+    -%}
+      {%- set_global counter = counter + 1 -%}
+    {%- endif -%}
+  {%- endfor -%}
+  {{- counter -}}
+{%- endmacro -%}
+
+{%- macro display(commits, header, python, bot=false, display_group=false) -%}
+  {%- set n_commits = self::count_commits(
+    commits=commits,
+    label="python",
+    bot=bot,
+    contains=python,
+  ) -%}
+  {%- if n_commits != "0" %}
+
+    ### {{ header }} ({{ n_commits }} commits)
+
+  {% endif -%}
+  {%- for commit in commits -%}
+    {%- if
+      (
+        python == "ignore"
+        or
+        (python and "python" in commit.github.pr_labels)
+        or
+        (not python and "python" not in commit.github.pr_labels)
+      )
+      and
+      (
+        bot == "ignore"
+        or
+        (bot and "[bot]" in commit.author.name)
+        or
+        (not bot and not "[bot]" in commit.author.name)
+      )
+    -%}
+      - \
+      {% if display_group -%}
+        {% if commit.group == "feat" -%}[FEATURE] \
+        {% elif commit.group == "fix" -%}[FIX] \
+        {% endif -%}
+      {%- endif -%}
+      {{ commit.message | split(pat="\n") | first | upper_first | trim }} \
+      {% if commit.github.username -%}
+        (by [__@{{ commit.github.username }}__](https://github.com/{{ commit.github.username }})) \
+      {% elif "[bot]" in commit.author.name -%}
+        (by __@{{ commit.author.name }}__ [BOT]) \
+      {% elif commit.author.name -%}
+        (by __@{{ commit.author.name }}__) \
+      {% endif -%}
+      {% if commit.github.pr_number -%}
+        ([#{{ commit.github.pr_number }}]({{ self::remote_url() }}/pull/{{ commit.github.pr_number }}))
+      {%- endif %}
+      {%- if commit.github.pr_labels and commit.github.pr_labels | length > 0 %}
+        {%- for label in commit.github.pr_labels -%}
+          {%- if label == "security" %} [SECURITY]
+          {%- elif label == "tests" %} [TESTS]
+          {%- elif label == "legal" %} [LEGAL]
+          {%- elif label == "docs" %} [DOCS]
+          {%- elif label == "actions" %} [ACTIONS]
+          {%- elif label == "config" %} [CONFIG]
+          {%- elif label == "deps" %} [DEPS]
+          {%- endif -%}
+        {%- endfor %}
+      {%- endif %}
+    {%- endif %}
+  {% endfor -%}
+{%- endmacro -%}
+"""
+
+footer = ""
+trim = true
+
+[tool.git-cliff.git]
+# parse the commits based on https://www.conventionalcommits.org
+conventional_commits = true
+# filter out the commits that are not conventional
+filter_unconventional = true
+# regex for parsing and grouping commits
+commit_parsers = [
+    { message= "^feat", group = "feat" },
+    { message= "^fix", group = "fix" },
+]
+# filter out the commits that are not matched by commit parsers
+filter_commits = true
+# sort the tags topologically
+topo_order = false
+# sort the commits inside sections by oldest/newest order
+sort_commits = "oldest"

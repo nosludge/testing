@@ -1,0 +1,677 @@
+# SPDX-FileCopyrightText: © 2024 nosludge <https://github.com/nosludge>
+# SPDX-FileContributor: szymonmaszke <github@maszke.co>
+#
+# SPDX-License-Identifier: Apache-2.0
+
+---
+name: "Release"
+
+on:
+  release:
+    types:
+      - "published"
+
+permissions: "write-all"
+
+# No concurrency, as these should run concurrently
+# if the release is created multiple times in quick
+# succession (highly unlikely though).
+env:
+  retention-days: 90
+
+# Do not run the release for Renovate Bot updates.
+# For it, run changelog generation and that should be it.
+jobs:
+  ###############################################################################
+  #
+  #                             SECURITY JOBS
+  #
+  ###############################################################################
+  sarifs:
+    strategy:
+      fail-fast: true
+      matrix:
+        type:
+          - "osv-scanner"
+          - "semgrep"
+          - "scorecard"
+    permissions:
+      # Required to upload SARIF file to CodeQL.
+      # See: https://github.com/github/codeql-action/issues/2117
+      actions: "read"
+      # Require writing security events to upload SARIF file to security tab
+      security-events: "write"
+      # Only need to read contents
+      contents: "read"
+    name: "OSV-Scanner"
+    uses: "./.github/workflows/security-${{ matrix.type }}-reusable.yml"
+    with:
+      name: "${{ matrix.type }}-${{ github.sha }}"
+      sarif: false
+
+  ###############################################################################
+  #
+  #                                 TESTS
+  #
+  ###############################################################################
+  python-tests:
+    name: "Python Tests"
+    if: >
+      ! contains(github.repository, 'pynudge')
+    permissions: "write-all"
+    uses: "./.github/workflows/tests-reusable.yml"
+    with:
+      upload-to-release: true
+
+  ###############################################################################
+  #
+  #                             PYTHON PACKAGE
+  #
+  ###############################################################################
+  # Works regardless of repo type
+  python-package-create:
+    name: "Python Package Create"
+    needs:
+      - "python-tests"
+    permissions:
+      contents: "read"
+    outputs:
+      package-version: "${{ steps.get-version.outputs.package-version }}"
+    runs-on: "ubuntu-latest"
+    steps:
+      - uses: "GitHubSecurityLab/actions-permissions/monitor@v1"
+      - name: "Harden Runner"
+        # yamllint disable rule:line-length
+        uses: "step-security/harden-runner@17d0e2bd7d51742c71671bd19fa12bdc9d40a3d6" # v2.8.1
+        # yamllint enable rule:line-length
+        with:
+          egress-policy: "audit"
+      - name: "Checkout repository"
+        # yamllint disable rule:line-length
+        uses: "actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332" # v4.1.7
+        # yamllint enable rule:line-length
+        with:
+          sparse-checkout: |
+            README.md
+            LICENSE.md
+            .github/actions/pdm-setup
+            pyproject.toml
+            pdm.lock
+            src
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
+      - name: "Setup PDM"
+        uses: "./.github/actions/pdm-setup"
+        with:
+          pdm-install: "-G:all --without
+             dev-test,\
+             dev-python,\
+             dev-yaml,\
+             dev-markdown,\
+             dev-ini,\
+             dev-pyproject,\
+             dev-citation,\
+             dev-docs,\
+             dev-security,\
+             dev-legal,\
+             dev-pre-commit,\
+             dev-commit,\
+             dev-generation,\
+             dev-workflows"
+      - name: "Build package"
+        run: >
+          pdm build --no-clean
+      - name: "Get package version"
+        id: "get-version"
+        # yamllint disable rule:line-length
+        run: >
+          echo "package-version=$(echo "dist/*.tar.gz" | cut -d '-' -f 2 | cut -d '.' -f 1-3)"
+          >> "${GITHUB_OUTPUT}"
+        # yamllint enable rule:line-length
+      - name: "Upload artifacts"
+        # yamllint disable rule:line-length
+        uses: "actions/upload-artifact@834a144ee995460fba8ed112a2fc961b36a5ec5a" # v4.3.6
+        # yamllint enable rule:line-length
+        with:
+          name: "dist"
+          path: "dist"
+          retention-days: "${{ env.retention-days }}"
+          overwrite: true
+
+  # Works regardless of repo type
+  sbom-python:
+    needs:
+      - "python-tests"
+    timeout-minutes: 30
+    name: >
+      SBOM |
+      python-${{ matrix.python-version }} |
+      ${{ matrix.os }}
+    outputs:
+      # yamllint disable rule:line-length
+      #
+      #           DO NOT EDIT UNTIL end marker
+      #
+      # [[[cog
+      #
+      # import cog
+      # import cogeol
+      #
+      # for version in reversed(cogeol.scientific()):
+      #     for os in ("ubuntu-latest", "macos-latest", "windows-latest"):
+      #         cycle = version["cycle"]
+      #         cog.outl(
+      #             f"      hash-{os}-{cycle}: >\n"
+      #             f"        ${{{{ 'steps.hash-{os}-{cycle}.outputs.hash' }}}}"
+      #         )
+      # ]]]
+      hash-ubuntu-latest-3.11: >
+        ${{ 'steps.hash-ubuntu-latest-3.11.outputs.hash' }}
+      hash-ubuntu-latest-3.12: >
+        ${{ 'steps.hash-ubuntu-latest-3.12.outputs.hash' }}
+      hash-ubuntu-latest-3.13: >
+        ${{ 'steps.hash-ubuntu-latest-3.13.outputs.hash' }}
+      hash-macos-latest-3.11: >
+        ${{ 'steps.hash-macos-latest-3.11.outputs.hash' }}
+      hash-macos-latest-3.12: >
+        ${{ 'steps.hash-macos-latest-3.12.outputs.hash' }}
+      hash-macos-latest-3.13: >
+        ${{ 'steps.hash-macos-latest-3.13.outputs.hash' }}
+      hash-windows-latest-3.11: >
+        ${{ 'steps.hash-windows-latest-3.11.outputs.hash' }}
+      hash-windows-latest-3.12: >
+        ${{ 'steps.hash-windows-latest-3.12.outputs.hash' }}
+      hash-windows-latest-3.13: >
+        ${{ 'steps.hash-windows-latest-3.13.outputs.hash' }}
+      # [[[end]]]
+      # yamllint enable rule:line-length
+    strategy:
+      fail-fast: true
+      matrix:
+        python-version:
+          #
+          #           DO NOT EDIT UNTIL end marker
+          #
+          # [[[cog
+          # import cog
+          # import cogeol
+          #
+          # for version in reversed(cogeol.scientific()):
+          #     cycle = version["cycle"]
+          #     cog.outl(f'          - "{cycle}"')
+          # ]]]
+          - "3.11"
+          - "3.12"
+          - "3.13"
+          # [[[end]]]
+        os:
+          - "ubuntu-latest"
+          - "macos-latest"
+          - "windows-latest"
+        dependencies:
+          - name: "dev"
+            package: "-G:all --no-editable"
+            # Main + optional dependencies only
+          - name: "package"
+            package: "-G:all --without
+                      dev-test,\
+                      dev-python,\
+                      dev-yaml,\
+                      dev-markdown,\
+                      dev-ini,\
+                      dev-pyproject,\
+                      dev-citation,\
+                      dev-docs,\
+                      dev-security,\
+                      dev-legal,\
+                      dev-pre-commit,\
+                      dev-commit,\
+                      dev-generation,\
+                      dev-workflows"
+    permissions:
+      contents: "read"
+    runs-on: "${{ matrix.os }}"
+    env:
+      # yamllint disable rule:line-length
+      SBOM_FILE: "sbom-python\
+                   -${{ matrix.dependencies.name}}\
+                   -${{ matrix.python-version }}\
+                   -${{ matrix.os }}\
+                   -${{ github.sha }}.json"
+      # yamllint enable rule:line-length
+    steps:
+      - name: "Harden Runner"
+        # yamllint disable rule:line-length
+        uses: "step-security/harden-runner@17d0e2bd7d51742c71671bd19fa12bdc9d40a3d6" # v2.8.1
+        # yamllint enable rule:line-length
+        with:
+          egress-policy: "audit"
+      - name: "Checkout repository"
+        # yamllint disable rule:line-length
+        uses: "actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332" # v4.1.7
+        # yamllint enable rule:line-length
+        with:
+          sparse-checkout: |
+            src
+            .github/actions/pdm-setup
+            .github/actions/sbom-upload
+            .github/actions/hash
+            pyproject.toml
+            pdm.lock
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
+      - name: "Setup PDM"
+        uses: "./.github/actions/pdm-setup"
+        with:
+          # Or should it be only non-dev dependencies?
+          pdm-install: "-G:all --no-editable" # All needed due to SBOM
+      - name: "Create Python SBOM"
+        env:
+          OUTPUT_FILE: "${{ env.identifier }}-${{ github.sha }}.json"
+        run: >
+          pdm run cyclonedx-py
+          environment "$(pdm --info)"
+          --PEP-639 --mc-type library
+          --schema-version 1.6 --output-reproducible
+          --outfile "${SBOM_FILE}"
+      - name: "Upload SBOM"
+        uses: "./.github/actions/sbom-upload"
+      - name: "Hash Files"
+        id: "hash-${{ matrix.os }}-${{ matrix.python-version }}"
+        uses: "./.github/actions/hash"
+        with:
+          # Path likely to be changed for a venv (?)
+          glob: >
+            __pypackages__/${{ matrix.python-version }}/lib/*.dist-info/RECORD
+
+  # Works regardless of repo type
+  attest-sbom-python:
+    name: >
+      Attest SBOM |
+      python-${{ matrix.python-version }} |
+      ${{ matrix.os }}
+    needs:
+      - "sbom-python"
+    strategy:
+      fail-fast: true
+      matrix:
+        python-version:
+          #
+          #           DO NOT EDIT UNTIL end marker
+          #
+          # [[[cog
+          # import cog
+          # import cogeol
+          #
+          # for version in reversed(cogeol.scientific()):
+          #     cycle = version["cycle"]
+          #     cog.outl(f'          - "{cycle}"')
+          # ]]]
+          - "3.11"
+          - "3.12"
+          - "3.13"
+          # [[[end]]]
+        os:
+          - "ubuntu-latest"
+          - "macos-latest"
+          - "windows-latest"
+    # SLSA Level 3+ needs outside workflow to run to perform the signing
+    uses: "./.github/workflows/attest-sbom-reusable.yml"
+    with:
+      # yamllint disable rule:line-length
+      hash: >
+        ${{ needs.sbom-python.outputs[format('hash-{0}-{1}', matrix.os, matrix.python-version)] }}
+      # yamllint enable rule:line-length
+      sbom: "sbom-python-${{ matrix.python-version }}-${{ matrix.os }}"
+
+  sbom-github:
+    name: "SBOM Github"
+    needs:
+      - "python-tests"
+    runs-on: "ubuntu-latest"
+    env:
+      identifier: "sbom-github"
+    outputs:
+      hash: "${{ steps.hash.outputs.hash }}"
+    steps:
+      - uses: "GitHubSecurityLab/actions-permissions/monitor@v1"
+      - name: "Harden Runner"
+        # yamllint disable rule:line-length
+        uses: "step-security/harden-runner@17d0e2bd7d51742c71671bd19fa12bdc9d40a3d6" # v2.8.1
+        # yamllint enable rule:line-length
+        with:
+          egress-policy: "audit"
+      - name: "Create GitHub SPDX SBOM"
+        run: >
+          gh api /repos/${{ github.repository }}/dependency-graph/sbom
+          > "${{ env.identifier }}-${{ github.sha }}.json"
+        env:
+          GH_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+      - name: "Checkout repository"
+        # yamllint disable rule:line-length
+        uses: "actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332" # v4.1.7
+        # yamllint enable rule:line-length
+        with:
+          sparse-checkout: |
+            ./.github/workflows
+            ./.github/actions/sbom-upload
+            ./.github/actions/hash
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
+      - name: "Upload SBOM"
+        uses: "./.github/actions/sbom-upload"
+      - name: "Hash Files"
+        id: "hash"
+        uses: "./.github/actions/hash"
+        with:
+          glob: >
+            ./.github/workflows/*.yml
+
+  # Works regardless of repo type (not really xD)
+  attest-sbom-github:
+    name: "Attest SBOM GitHub"
+    needs:
+      - "sbom-github"
+    # SLSA Level 3+ needs outside workflow to run to perform the signing
+    uses: "./.github/workflows/attest-sbom-reusable.yml"
+    with:
+      hash: "${{ needs.sbom-github.outputs.hash }}"
+      sbom: "sbom-github"
+
+  # Works regardless of repo type
+  sbom-reuse:
+    name: "SBOM REUSE"
+    needs:
+      - "python-tests"
+    runs-on: "ubuntu-latest"
+    outputs:
+      hash: "${{ steps.hash.outputs.hash }}"
+    env:
+      identifier: "sbom-reuse"
+    steps:
+      - uses: "GitHubSecurityLab/actions-permissions/monitor@v1"
+      - name: "Harden Runner"
+        # yamllint disable rule:line-length
+        uses: "step-security/harden-runner@17d0e2bd7d51742c71671bd19fa12bdc9d40a3d6" # v2.8.1
+        # yamllint enable rule:line-length
+        with:
+          egress-policy: "audit"
+      - name: "Checkout repository"
+        # yamllint disable rule:line-length
+        uses: "actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332" # v4.1.7
+        # yamllint enable rule:line-length
+        with:
+          persist-credentials: false
+      - name: "Setup PDM"
+        uses: "./.github/actions/pdm-setup"
+        with:
+          pdm-install: "-G legal --no-self" # SPDX, licensing etc.
+      - name: "Create Reuse SPDX SBOM"
+        env:
+          ACTOR: "${{ github.actor }}"
+          REPOSITORY_OWNER: "${{ github.repository_owner }}"
+        run: >
+          pdm run reuse spdx
+          --creator-person "${ACTOR}"
+          --creator-organization "${REPOSITORY_OWNER}"
+          --output "${IDENTIFIER}-${GITHUB_SHA}.json"
+      - name: "Upload SBOM"
+        uses: "./.github/actions/sbom-upload"
+      - name: "Find all files"
+        id: "find"
+        run: >
+          echo "files=$(find . -type f)" >> "${GITHUB_OUTPUT}"
+      - name: "Hash Files"
+        id: "hash"
+        uses: "./.github/actions/hash"
+        with:
+          glob: "${{ steps.find.outputs.files }}"
+
+  # Works regardless of repo type (not really xD)
+  attest-sbom-reuse:
+    name: "Attest SBOM REUSE"
+    needs:
+      - "sbom-reuse"
+    # SLSA Level 3+ needs outside workflow to run to perform the signing
+    uses: "./.github/workflows/attest-sbom-reusable.yml"
+    with:
+      hash: "${{ needs.sbom-reuse.outputs.hash }}"
+      sbom: "sbom-reuse"
+
+  # Works on public repositories only
+  hash-all-artifacts:
+    name: "Hash All Artifacts"
+    if: "github.event.repository.visibility == 'public'"
+    needs:
+      - "sarifs"
+      - "python-package-create"
+      - "attest-sbom-python"
+      - "attest-sbom-github"
+      - "attest-sbom-reuse"
+    outputs:
+      hash: "${{ steps.hash.outputs.hash }}"
+    runs-on: "ubuntu-latest"
+    permissions: "write-all"
+
+    steps:
+      - uses: "GitHubSecurityLab/actions-permissions/monitor@v1"
+      - name: "Harden Runner"
+        # yamllint disable rule:line-length
+        uses: "step-security/harden-runner@17d0e2bd7d51742c71671bd19fa12bdc9d40a3d6" # v2.8.1
+        # yamllint enable rule:line-length
+        with:
+          egress-policy: "audit"
+      - name: "Download artifacts"
+        # yamllint disable rule:line-length
+        uses: "actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16" # v4.1.8
+        # yamllint enable rule:line-length
+      - name: "Checkout repository"
+        # yamllint disable rule:line-length
+        uses: "actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332" # v4.1.7
+        # yamllint enable rule:line-length
+        with:
+          # To generate full changelog
+          sparse-checkout: |
+            .github/actions/hash
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
+      - name: "Hash Files"
+        id: "hash"
+        uses: "./.github/actions/hash"
+        with:
+          glob: "./dist/* sbom-* attestation-* *.sarif"
+
+  # Works on public repositories only
+  # This is SLSA Level 3+
+  # Only runs for public repositories due to possible data leakage
+  # See comments below
+  provenance-attestation:
+    name: "Provenance Attestation"
+    if: >
+      github.event.repository.visibility == 'public'
+    needs:
+      - "hash-all-artifacts"
+    permissions:
+      # IMPORTANT: this permission is mandatory for trusted publishing
+      actions: "read" # To read the workflow path.
+      id-token: "write" # To sign the provenance.
+      contents: "write" # To add assets to a release.
+    # yamllint disable rule:line-length
+    # Currently this action needs to be referred by tag. More details at:
+    # https://github.com/slsa-framework/slsa-github-generator#verification-of-provenance
+    uses: "slsa-framework/slsa-github-generator/.github/workflows/generator_generic_slsa3.yml@v2.0.0"
+    # yamllint enable rule:line-length
+    with:
+      provenance-name: "slsa-provenance-multiple-${{ github.sha }}.intoto.jsonl"
+      base64-subjects: "${{ needs.hash-all-artifacts.outputs.hash }}"
+      upload-assets: true
+      continue-on-error: true
+
+  github-release:
+    name: "GitHub Release"
+    needs:
+      - "python-package-create"
+    env:
+      PYTHON_PACKAGE_VERSION: >
+        ${{ needs.python-package-create.outputs.package-version }}
+      TAG_NAME: "${{ github.event.release.tag_name }}"
+    runs-on: "ubuntu-latest"
+    # permissions:
+    #   # Needed to upload release assets.
+    #   contents: write
+    steps:
+      - uses: "GitHubSecurityLab/actions-permissions/monitor@v1"
+      - name: "Harden Runner"
+        # yamllint disable rule:line-length
+        uses: "step-security/harden-runner@17d0e2bd7d51742c71671bd19fa12bdc9d40a3d6" # v2.8.1
+        # yamllint enable rule:line-length
+        with:
+          egress-policy: "audit"
+      - name: "Checkout repository"
+        # yamllint disable rule:line-length
+        uses: "actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332" # v4.1.7
+        # yamllint enable rule:line-length
+        with:
+          # To generate full changelog
+          fetch-depth: 0
+          sparse-checkout: |
+            pyproject.toml
+            LICENSE.md
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
+      - name: "Generate full changelog"
+        # yamllint disable rule:line-length
+        uses: "orhun/git-cliff-action@4a4a951bc43fafe41cd2348d181853f52356bee7" # v4.4.2
+        # yamllint enable rule:line-length
+        id: "full-changelog"
+        with:
+          config: "pyproject.toml"
+      - name: "Generate latest changelog"
+        # yamllint disable rule:line-length
+        uses: "orhun/git-cliff-action@4a4a951bc43fafe41cd2348d181853f52356bee7" # v4.4.2
+        # yamllint enable rule:line-length
+        id: "latest-changelog"
+        with:
+          config: "pyproject.toml"
+          args: "--latest"
+      - name: "Update Release changelog"
+        env:
+          GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+          CHANGELOG_CONTENT: "${{ steps.latest-changelog.outputs.content }}"
+        run: >
+          gh release edit "${TAG_NAME}" --latest
+          --notes "${CHANGELOG_CONTENT}"
+      - name: "Upload artifacts to release"
+        env:
+          GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+          TAG_NAME: "${{ github.event.release.tag_name }}"
+          CHANGELOG: "${{ steps.full-changelog.outputs.changelog }}"
+        run: >
+          gh release upload "${TAG_NAME}"
+          LICENSE.md "${CHANGELOG}"
+
+  release-leftover-upload:
+    name: "Release Leftover Upload"
+    runs-on: "ubuntu-latest"
+    # permissions:
+    #   # Needed to upload release assets.
+    #   contents: write
+    steps:
+      - uses: "GitHubSecurityLab/actions-permissions/monitor@v1"
+      - name: "Harden Runner"
+        # yamllint disable rule:line-length
+        uses: "step-security/harden-runner@17d0e2bd7d51742c71671bd19fa12bdc9d40a3d6" # v2.8.1
+        # yamllint enable rule:line-length
+        with:
+          egress-policy: "audit"
+      - name: "Download artifacts"
+        # yamllint disable rule:line-length
+        uses: "actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16" # v4.1.8
+        # yamllint enable rule:line-length
+      - name: "Upload artifacts to release"
+        env:
+          GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+          TAG_NAME: "${{ github.event.release.tag_name }}"
+        run: >
+          gh release upload "${TAG_NAME}"
+          ./*.sarif
+
+  python-package-attested-upload:
+    name: "Python Package Attested Upload to ${{ matrix.repository.name }}"
+    needs:
+      - "python-package-create"
+    if: >
+      github.event.repository.visibility == 'public'
+      && ! contains(github.repository, 'pynudge_test')
+      && contains(needs.*.result, 'success')
+    strategy:
+      fail-fast: true
+      matrix:
+        repository:
+          - url: "https://pypi.org/simple/"
+            endpoints: |
+              pypi.org:443
+              files.pythonhosted.org:443
+            attestations: true
+            name: "PyPI"
+            # - url: https://test.pypi.org/simple/
+            #   endpoints: |
+            #     test.pypi.org:443
+            #     files.pythonhosted.org:443
+            #   attestations: true
+    # Change to nosludge specific location for SLSA3 upload action
+    # Change when the issue below is resolved so there is SLSA3 compatibility
+    # https://github.com/pypi/warehouse/issues/11096
+    uses: "./.github/workflows/attest-package-reusable.yml"
+    with:
+      repository-url: "${{ matrix.repository.url }}"
+      endpoints: "${{ matrix.repository.endpoints }}"
+      attestations: "${{ matrix.repository.attestations }}"
+
+  docs-release:
+    name: "Docs Release"
+    needs:
+      - "python-package-attested-upload"
+    if: >
+      ! contains(github.event.head_commit.message, 'Initial commit')
+    timeout-minutes: 10
+    runs-on: "ubuntu-latest"
+    permissions: "write-all"
+    steps:
+      - uses: "GitHubSecurityLab/actions-permissions/monitor@v1"
+      - name: "Harden Runner"
+        # yamllint disable rule:line-length
+        uses: "step-security/harden-runner@17d0e2bd7d51742c71671bd19fa12bdc9d40a3d6" # v2.8.1
+        # yamllint enable rule:line-length
+        with:
+          egress-policy: "audit"
+      #   with:
+      #     egress-policy: block
+      #     allowed-endpoints: >
+      #       github.com:443
+      - name: "Checkout repository" # zizmor: ignore[artipacked]
+        # yamllint disable rule:line-length
+        uses: "actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332" # v4.1.7
+        # yamllint enable rule:line-length
+        with:
+          sparse-checkout: |
+            .github/actions/pdm-setup
+            .github/actions/git-setup
+            pyproject.toml
+            pdm.lock
+            mkdocs.yml
+            docs/
+            src/**.py
+            **.md
+          sparse-checkout-cone-mode: false
+          fetch-depth: 0 # Needed for mkdocs plugins
+      - name: "Setup PDM"
+        uses: "./.github/actions/pdm-setup"
+        with:
+          # Static docs generation only with these dependenciesfiles only wit
+          pdm-install: "-G docs --no-self" # python-docs-release.yml
+      - name: "Setup git credentials"
+        uses: "./.github/actions/git-setup"
+      - name: "Publish docs"
+        run: "pdm run mkdocs gh-deploy --message 'feat: release {version}'"
+...

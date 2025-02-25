@@ -1,0 +1,34 @@
+# SPDX-FileCopyrightText: © 2024 nosludge <https://github.com/nosludge>
+# SPDX-FileContributor: szymonmaszke <github@maszke.co>
+#
+# SPDX-License-Identifier: Apache-2.0
+
+---
+name: "pyproject"
+
+on:
+  pull_request:
+    branches:
+      - "main"
+    paths:
+      - "pyproject.toml"
+  merge_group:
+    types:
+      - "checks_requested"
+
+permissions: {} # yamllint disable-line rule:braces
+
+concurrency:
+  group: >
+    ${{ github.workflow_ref }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pyproject-linter:
+    name: "pyproject"
+    permissions:
+      contents: "read"
+    uses: "./.github/workflows/pdm-reusable.yml"
+    with:
+      prefix: "pyproject"
+...

@@ -1,0 +1,26 @@
+# SPDX-FileCopyrightText: © 2024 nosludge <https://github.com/nosludge>
+# SPDX-FileContributor: szymonmaszke <github@maszke.co>
+#
+# SPDX-License-Identifier: Apache-2.0
+
+---
+name: "Markdown Reusable"
+
+on:
+  workflow_call:
+
+permissions: {} # yamllint disable-line rule:braces
+
+jobs:
+  markdown-reusable:
+    name: "Markdown Reusable"
+    permissions:
+      contents: "read"
+    uses: "./.github/workflows/pdm-reusable.yml"
+    with:
+      prefix: "markdown"
+      checkout: |
+        '**.md'
+        '!LICENSE.md'
+        '!DCO.md'
+...

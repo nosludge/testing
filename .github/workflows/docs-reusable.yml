@@ -1,0 +1,27 @@
+# SPDX-FileCopyrightText: © 2024 nosludge <https://github.com/nosludge>
+# SPDX-FileContributor: szymonmaszke <github@maszke.co>
+#
+# SPDX-License-Identifier: Apache-2.0
+
+---
+name: "Docs Reusable"
+
+on:
+  workflow_call:
+
+permissions: {} # yamllint disable-line rule:braces
+
+jobs:
+  docs-reusable:
+    name: "Docs Reusable"
+    permissions:
+      contents: "read"
+    uses: "./.github/workflows/pdm-reusable.yml"
+    with:
+      prefix: "docs"
+      checkout: |
+        src/**.py
+        **.ipynb
+        **.md
+        mkdocs.yml
+...

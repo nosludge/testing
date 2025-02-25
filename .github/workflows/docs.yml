@@ -1,0 +1,35 @@
+# SPDX-FileCopyrightText: © 2024 nosludge <https://github.com/nosludge>
+# SPDX-FileContributor: szymonmaszke <github@maszke.co>
+#
+# SPDX-License-Identifier: Apache-2.0
+
+---
+name: "Docs"
+
+on:
+  pull_request:
+    branches:
+      - "main"
+    paths:
+      - "**.md"
+      - "mkdocs.yml"
+      - "docs/**"
+      - "src/**.py"
+  merge_group:
+    types:
+      - "checks_requested"
+
+permissions: {} # yamllint disable-line rule:braces
+
+concurrency:
+  cancel-in-progress: true
+  group: >
+    ${{ github.workflow_ref }}-${{ github.ref }}
+
+jobs:
+  docs:
+    name: "Docs"
+    permissions:
+      contents: "read"
+    uses: "./.github/workflows/docs-reusable.yml"
+...

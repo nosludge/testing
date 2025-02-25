@@ -1,0 +1,18 @@
+# SPDX-FileCopyrightText: © 2024 nosludge <https://github.com/nosludge>
+# SPDX-FileContributor: szymonmaszke <github@maszke.co>
+#
+# SPDX-License-Identifier: Apache-2.0
+
+---
+cff-version: 1.2.0
+abstract: {{cookiecutter.description}}
+message: If you use this software, please cite it as below.
+authors:
+  - family-names: {{cookiecutter.repository_owner}}
+url: https://github.com/{{cookiecutter.repository}}/{{cookiecutter.repository_owner}}
+repository-code: https://github.com/{{cookiecutter.repository}}/{{cookiecutter.repository_owner}}
+title: {{cookiecutter.repository}}
+date-released: {% now 'utc', '%Y-%m-%d' %}
+license: Apache-2.0
+keywords:
+  - python

@@ -1,0 +1,96 @@
+# SPDX-FileCopyrightText: © 2024 nosludge <https://github.com/nosludge>
+# SPDX-FileContributor: szymonmaszke <github@maszke.co>
+#
+# SPDX-License-Identifier: Apache-2.0
+
+---
+name: "pre-commit Update"
+
+on:
+  schedule:
+    - cron: "0 3 * * 6"
+  workflow_dispatch:
+
+permissions: {} # yamllint disable-line rule:braces
+
+concurrency:
+  group: >
+    ${{ github.workflow_ref }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pre-commit-update:
+    timeout-minutes: 10
+    name: "pre-commit Update"
+    permissions:
+      contents: "read"
+      pull-requests: "write"
+    runs-on: "ubuntu-latest"
+    env:
+      BRANCH_NAME: "bot/pre-commit-dependencies-update/${{ github.run_id }}"
+    steps:
+      - name: "Harden Runner"
+        # yamllint disable rule:line-length
+        uses: "step-security/harden-runner@17d0e2bd7d51742c71671bd19fa12bdc9d40a3d6" # v2.8.1
+        # yamllint enable rule:line-length
+        with:
+          disable-sudo: true
+          egress-policy: "block"
+          allowed-endpoints: >
+            api.github.com:443
+            files.pythonhosted.org:443
+            github.com:443
+            pdm-project.org:443
+            pdm.fming.dev:443
+            pypi.org:443
+            raw.githubusercontent.com:443
+      - name: "Checkout repository"
+        # yamllint disable rule:line-length
+        uses: "actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332" # v4.1.7
+        # yamllint enable rule:line-length
+        with:
+          sparse-checkout: |
+            README.md
+            LICENSE.md
+            .github/actions/pdm-setup
+            .github/actions/git-setup
+            .github/actions/pull-request
+            .pre-commit-config.yaml
+            pyproject.toml
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
+      - name: "Setup PDM"
+        uses: "./.github/actions/pdm-setup"
+        with:
+          pdm-install: "-G:all --no-editable" # Used for pre-commit checks
+      - name: "Setup git credentials"
+        uses: "./.github/actions/git-setup"
+      - name: "Create new branch"
+        run: >
+          git checkout -b "${BRANCH_NAME}"
+      - name: "Update pre-commit dependencies"
+        run: >
+          pdm run -v pre-commit autoupdate --freze
+      - name: "Check for changes"
+        id: "check-changes"
+        # yamllint disable rule:indentation
+        run: |
+          if git diff --exit-code .pre-commit-config.yaml; then
+            echo "changed=true" >> "${GITHUB_OUTPUT}"
+          else
+            echo "changed=false" >> "${GITHUB_OUTPUT}"
+          fi
+        # yamllint enable rule:indentation
+      - name: "Run pre-commit with updated dependencies"
+        if: >
+          steps.check-changes.outputs.changed == 'true'
+        run: >
+          pdm run -v pre-commit run --all-files
+      - name: "Push changes"
+        if: >
+          steps.check-changes.outputs.changed == 'true'
+        uses: "./.github/actions/pull-request"
+        with:
+          commit-message: "update pre-commit dependencies"
+          branch-name: "bot/pre-commit-dependencies-update/${{ github.run_id }}"
+...

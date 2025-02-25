@@ -1,0 +1,30 @@
+# SPDX-FileCopyrightText: © 2024 nosludge <https://github.com/nosludge>
+# SPDX-FileContributor: szymonmaszke <github@maszke.co>
+#
+# SPDX-License-Identifier: Apache-2.0
+
+---
+name: "Cache"
+
+on:
+  push:
+    branches:
+      - "main"
+  workflow_dispatch:
+
+permissions: {} # yamllint disable-line rule:braces
+
+concurrency:
+  group: >
+    ${{ github.workflow_ref }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  cache:
+    name: "Cache"
+    # Skip initial commit
+    if: "${{ github.event.head_commit.message != 'Initial commit' }}"
+    permissions:
+      contents: "read"
+    uses: "./.github/workflows/cache-reusable.yml"
+...

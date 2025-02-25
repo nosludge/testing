@@ -1,0 +1,33 @@
+# SPDX-FileCopyrightText: © 2024 nosludge <https://github.com/nosludge>
+# SPDX-FileContributor: szymonmaszke <github@maszke.co>
+#
+# SPDX-License-Identifier: Apache-2.0
+
+---
+name: "Renovate Markdown Linter"
+
+on:
+  pull_request:
+    branches:
+      - "main"
+  merge_group:
+    types:
+      - "checks_requested"
+
+permissions: {} # yamllint disable-line rule:braces
+
+concurrency:
+  group: >
+    ${{ github.workflow_ref }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: "Renovate Markdown Linter"
+    if: |
+      github.event.pull_request.user.login == 'renovate[bot]'
+      && github.ref == 'refs/heads/renovate/dev-dependencies-markdown'
+    permissions:
+      contents: "read"
+    uses: "./.github/workflows/markdown-reusable.yml"
+...

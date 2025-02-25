@@ -1,0 +1,43 @@
+# SPDX-FileCopyrightText: © 2024 nosludge <https://github.com/nosludge>
+# SPDX-FileContributor: szymonmaszke <github@maszke.co>
+#
+# SPDX-License-Identifier: Apache-2.0
+
+---
+name: "SHA256 Hash and base64 encode"
+description: >
+  Hash files, encode via base64 and store as hash in $GITHUB_OUTPUT
+
+inputs:
+  glob:
+    description: "A glob with file(s) to hash"
+    required: true
+outputs:
+  hash:
+    description: "Encoded SHA256 hash"
+    value: "${{ steps.hash.outputs.hash }}"
+
+runs:
+  using: "composite"
+  steps:
+    - name: "Encode files"
+      id: "hash"
+      shell: "bash"
+      env:
+        GLOB: "${{ inputs.glob }}"
+      # yamllint disable rule:indentation
+      run: |
+        set -uo pipefail
+
+        # shellcheck disable=SC2086
+        SHA256=$(shasum -a 256 $GLOB 2>/dev/null)
+        if test "${RUNNER_OS}" = "macOS"; then
+          # Echo SHA256 to base64 and store in GITHUB_OUTPUT under name hash=
+          ENCODED=$(echo "${SHA256}" | base64)
+        else
+          ENCODED=$(echo "${SHA256}" | base64 -w 0)
+        fi
+
+        echo "hash=${ENCODED}" >> "${GITHUB_OUTPUT}"
+      # yamllint enable rule:indentation
+...

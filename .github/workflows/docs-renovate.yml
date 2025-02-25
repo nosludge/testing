@@ -1,0 +1,33 @@
+# SPDX-FileCopyrightText: © 2024 nosludge <https://github.com/nosludge>
+# SPDX-FileContributor: szymonmaszke <github@maszke.co>
+#
+# SPDX-License-Identifier: Apache-2.0
+
+---
+name: "Renovate Docs"
+
+on:
+  pull_request:
+    branches:
+      - "main"
+  merge_group:
+    types:
+      - "checks_requested"
+
+permissions: {} # yamllint disable-line rule:braces
+
+concurrency:
+  group: >
+    ${{ github.workflow_ref }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  renovate-docs:
+    name: "Renovate Docs"
+    permissions:
+      contents: "read"
+    if: |
+      github.event.pull_request.user.login == 'renovate[bot]'
+      && github.ref == 'refs/heads/renovate/dependencies-dev-docs'
+    uses: "./.github/workflows/docs-reusable.yml"
+...

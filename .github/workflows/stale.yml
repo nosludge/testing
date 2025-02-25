@@ -1,0 +1,54 @@
+# SPDX-FileCopyrightText: © 2024 nosludge <https://github.com/nosludge>
+# SPDX-FileContributor: szymonmaszke <github@maszke.co>
+#
+# SPDX-License-Identifier: Apache-2.0
+
+---
+name: "Stale"
+on:
+  schedule:
+    - cron: "0 3 * * 6"
+  workflow_dispatch:
+
+permissions: {} # yamllint disable-line rule:braces
+
+jobs:
+  stale:
+    timeout-minutes: 10
+    name: "Stale"
+    permissions:
+      issues: "write"
+      pull-requests: "write"
+    runs-on: "ubuntu-latest"
+    steps:
+      - name: "Harden Runner"
+        # yamllint disable rule:line-length
+        uses: "step-security/harden-runner@17d0e2bd7d51742c71671bd19fa12bdc9d40a3d6" # v2.8.1
+        # yamllint enable rule:line-length
+        with:
+          egress-policy: "audit"
+      #   with:
+      #     egress-policy: block
+      #     allowed-endpoints: >
+      #       api.github.com:443
+      #       github.com:443
+      - name: "Mark stale PRs"
+        # yamllint disable rule:line-length
+        uses: "actions/stale@28ca1036281a5e5922ead5184a1bbf96e5fc984e" # v9.0.0
+        # yamllint enable rule:line-length
+        with:
+          stale-pr-message: >
+            This pull request did not receive any commits in the last 7 days.
+            Marking pull request as stale (push additional commits or
+            merge to unstale it).
+          close-pr-message: >
+            This PR was stale for the last 7 days.
+            Closing the PR (one can reopen it at any time
+            by commiting and/or merging).
+          days-before-pr-stale: 14
+          days-before-pr-close: 28
+          stale-pr-label: "stale"
+          close-pr-label: "expired"
+          remove-pr-stale-when-updated: true
+          labels-to-remove-when-unstale: "stale"
+...

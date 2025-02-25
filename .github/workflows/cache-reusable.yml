@@ -1,0 +1,115 @@
+# SPDX-FileCopyrightText: © 2024 nosludge <https://github.com/nosludge>
+# SPDX-FileContributor: szymonmaszke <github@maszke.co>
+#
+# SPDX-License-Identifier: Apache-2.0
+
+---
+name: "Cache Reusable"
+
+on:
+  workflow_call:
+
+permissions: {} # yamllint disable-line rule:braces
+
+jobs:
+  # This cache is any OS + multiple Python versions
+  cache-reusable:
+    name: >
+      Cache | ${{ matrix.pdm-install }} |
+      python-${{ matrix.python-version }} |
+      ${{ matrix.os }}
+    strategy:
+      fail-fast: true
+      matrix:
+        pdm-install:
+          # yamllint disable rule:line-length
+          # Main + optional dependencies only
+          - "-G:all --without
+             dev-test,\
+             dev-python,\
+             dev-yaml,\
+             dev-markdown,\
+             dev-ini,\
+             dev-pyproject,\
+             dev-citation,\
+             dev-docs,\
+             dev-security,\
+             dev-legal,\
+             dev-pre-commit,\
+             dev-commit,\
+             dev-generation,\
+             dev-workflows"
+
+          # Main + optional dependencies with tests
+          - "-G:all --without
+             dev-python,\
+             dev-yaml,\
+             dev-markdown,\
+             dev-ini,\
+             dev-pyproject,\
+             dev-citation,\
+             dev-security,\
+             dev-docs,\
+             dev-legal,\
+             dev-pre-commit,\
+             dev-commit,\
+             dev-generation,\
+             dev-workflows"
+          # yamllint enable rule:line-length
+          # No editable necessary for Python SBOM to assess our package
+          - "-G:all --no-editable" # Python SBOM creation for multiple OSes
+        python-version:
+          #
+          #           DO NOT EDIT UNTIL end marker
+          #
+          # [[[cog
+          # import cog
+          # import cogeol
+          #
+          # for version in reversed(cogeol.scientific()):
+          #     cycle = version["cycle"]
+          #     cog.outl(f'          - "{cycle}"')
+          # ]]]
+          - "3.11"
+          - "3.12"
+          - "3.13"
+          # [[[end]]]
+        os:
+          - "ubuntu-latest"
+          - "macos-latest"
+          - "windows-latest"
+    permissions:
+      contents: "read"
+    uses: "./.github/workflows/cache-item-reusable.yml"
+    with:
+      pdm-install: "${{ matrix.pdm-install }}"
+      python-version: "${{ matrix.python-version }}"
+      os: "${{ matrix.os }}"
+
+  cache-dev-dependencies:
+    name: "Cache Dev Dependencies | ${{ matrix.pdm-install }}"
+    permissions:
+      contents: "read"
+    strategy:
+      fail-fast: true
+      matrix:
+        # --no-editable not needed for dev dependencies
+        pdm-install:
+          - "test" # python-coverage.yml
+          - "python" # python-linter.yml
+          - "yaml" # yaml-linter.yml
+          - "markdown" # markdown-linter.yml
+          - "ini" # ini-linter.yml
+          - "pyproject" # pyproject-linter.yml
+          - "citation" # citation-linter.yml
+          - "pre-commit" # pre-commit-linter.yml
+          - "commit" # commit related checks
+          - "generation" # static generation
+          - "docs" # docs-check.yml and python-docs-release.yml
+          - "legal" # legal-linter.yml
+          - "security" # Sigstore, python-semantic-release etc.
+          - "workflows" # zizmor GH Actions static checks etc.
+    uses: "./.github/workflows/cache-item-reusable.yml"
+    with:
+      pdm-install: "-G dev-${{ matrix.pdm-install }} --no-self"
+...

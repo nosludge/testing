@@ -1,0 +1,23 @@
+# SPDX-FileCopyrightText: © 2024 nosludge <https://github.com/nosludge>
+# SPDX-FileContributor: szymonmaszke <github@maszke.co>
+#
+# SPDX-License-Identifier: Apache-2.0
+
+---
+name: "Python Reusable"
+
+on:
+  workflow_call:
+
+permissions: {} # yamllint disable-line rule:braces
+
+jobs:
+  python-reusable:
+    name: "Python Reusable"
+    permissions:
+      contents: "read"
+    uses: "./.github/workflows/pdm-reusable.yml"
+    with:
+      prefix: "python"
+      checkout: "**.py"
+...

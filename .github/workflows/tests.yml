@@ -1,0 +1,36 @@
+# SPDX-FileCopyrightText: © 2024 nosludge <https://github.com/nosludge>
+# SPDX-FileContributor: szymonmaszke <github@maszke.co>
+#
+# SPDX-License-Identifier: Apache-2.0
+
+---
+name: "Python Tests"
+
+on:
+  pull_request:
+    branches:
+      - "main"
+    paths:
+      - "src/**"
+      - "test/**"
+      - "pyproject.toml"
+      - "pdm.lock"
+  merge_group:
+    types:
+      - "checks_requested"
+
+permissions: {} # yamllint disable-line rule:braces
+
+concurrency:
+  group: >
+    ${{ github.workflow_ref }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  python-tests:
+    name: "Python Tests"
+    if: >
+      ! contains(github.repository, 'pynudge')
+    permissions: "write-all"
+    uses: "./.github/workflows/tests-reusable.yml"
+...

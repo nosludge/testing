@@ -1,0 +1,47 @@
+# SPDX-FileCopyrightText: © 2024 nosludge <https://github.com/nosludge>
+# SPDX-FileContributor: szymonmaszke <github@maszke.co>
+#
+# SPDX-License-Identifier: Apache-2.0
+
+---
+name: "Security Trufflehog"
+
+on:
+  pull_request:
+    branches:
+      - "main"
+  merge_group:
+    types:
+      - "checks_requested"
+
+permissions: {} # yamllint disable-line rule:braces
+
+jobs:
+  security-trufflehog:
+    timeout-minutes: 10
+    permissions:
+      # Only need to read contents
+      contents: "read"
+    name: "Security Trufflehog"
+    runs-on: "ubuntu-latest"
+    steps:
+      - name: "Harden Runner"
+        # yamllint disable rule:line-length
+        uses: "step-security/harden-runner@17d0e2bd7d51742c71671bd19fa12bdc9d40a3d6" # v2.8.1
+        # yamllint enable rule:line-length
+        with:
+          egress-policy: "audit"
+      - name: "Checkout repository"
+        # yamllint disable rule:line-length
+        uses: "actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332" # v4.1.7
+        # yamllint enable rule:line-length
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: "TruffleHog OSS"
+        # yamllint disable rule:line-length
+        uses: "trufflesecurity/trufflehog@4484bf443b7858d89dd26541f46a3ae0794206a5" # v3.8.5
+        # yamllint enable rule:line-length
+        with:
+          extra_args: "--debug --only-verified"
+...

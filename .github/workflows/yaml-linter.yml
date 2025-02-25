@@ -1,0 +1,33 @@
+# SPDX-FileCopyrightText: © 2024 nosludge <https://github.com/nosludge>
+# SPDX-FileContributor: szymonmaszke <github@maszke.co>
+#
+# SPDX-License-Identifier: Apache-2.0
+
+---
+name: "YAML Linter"
+
+on:
+  pull_request:
+    branches:
+      - "main"
+    paths:
+      - "'**.yml'"
+      - "'**.yaml'"
+  merge_group:
+    types:
+      - "checks_requested"
+
+permissions: {} # yamllint disable-line rule:braces
+
+concurrency:
+  group: >
+    ${{ github.workflow_ref }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  yaml-linter:
+    name: "YAML Linter"
+    permissions:
+      contents: "read"
+    uses: "./.github/workflows/yaml-reusable.yml"
+...

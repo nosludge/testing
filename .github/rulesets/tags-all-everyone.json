@@ -1,0 +1,31 @@
+{
+  "enforcement": "active",
+  "name": "tags-all",
+  "rules": [
+    {
+      "type": "create"
+    },
+    {
+      "type": "update",
+      "parameters": {
+        "update_allows_fetch_and_merge": true
+      }
+    },
+    {
+      "type": "deletion"
+    },
+    {
+      "type": "non_fast_forward"
+    }
+  ],
+  "conditions": {
+    "ref_name": {
+      "include": [
+        "~ALL"
+      ],
+      "exclude": [
+      ]
+    }
+  },
+  "target": "branch"
+}

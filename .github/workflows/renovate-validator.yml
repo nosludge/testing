@@ -1,0 +1,55 @@
+# SPDX-FileCopyrightText: © 2024 nosludge <https://github.com/nosludge>
+# SPDX-FileContributor: szymonmaszke <github@maszke.co>
+#
+# SPDX-License-Identifier: Apache-2.0
+
+---
+name: "Renovate Validator"
+
+on:
+  pull_request:
+    branches:
+      - "main"
+    paths:
+      - "**/renovate.json*"
+      - "*.renovaterc.json*"
+  merge_group:
+    types:
+      - "checks_requested"
+
+permissions: {} # yamllint disable-line rule:braces
+
+jobs:
+  renovate-validator:
+    name: "Renovate Validator"
+    if: >
+      github.actor != 'github-actions[bot]'
+    permissions:
+      contents: "read"
+    timeout-minutes: 10
+    runs-on: "ubuntu-latest"
+    steps:
+      - name: "Checkout Repository"
+        # yamllint disable rule:line-length
+        uses: "actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332" # v4.1.7
+        # yamllint enable rule:line-length
+        with:
+          sparse-checkout: |
+            "**/renovate.json*"
+            "*.renovaterc.json*"
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
+      # Needed as the cmd has to be passed as file...
+      - name: "Create entrypoint file"
+        run: >
+          echo "renovate -- renovate-config-validator --strict"
+          >> temporary-renovate-entrypoint.sh
+      - name: "Self-hosted Renovate"
+        # yamllint disable rule:line-length
+        uses: "renovatebot/github-action@0c94129d48b4e92addf23686b8a735b3057a0448" # v40.2.5
+        # yamllint enable rule:line-length
+        with:
+          # Docker-volumes have to be added? :(
+          configurationFile: "./.github/renovate.json"
+          docker-cmd-file: "temporary-renovate-entrypoint.sh"
+...

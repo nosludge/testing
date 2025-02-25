@@ -1,0 +1,30 @@
+# SPDX-FileCopyrightText: © 2024 nosludge <https://github.com/nosludge>
+# SPDX-FileContributor: szymonmaszke <github@maszke.co>
+#
+# SPDX-License-Identifier: Apache-2.0
+
+---
+name: "Security OSV-Scanner Update"
+
+on:
+  schedule:
+    - cron: "0 3 * * 6"
+  workflow_dispatch:
+
+permissions: {} # yamllint disable-line rule:braces
+
+jobs:
+  security-osv-scanner-update:
+    permissions:
+      # Required to upload SARIF file to CodeQL.
+      # See: https://github.com/github/codeql-action/issues/2117
+      actions: "read"
+      # Require writing security events to upload SARIF file to security tab
+      security-events: "write"
+      # Only need to read contents
+      contents: "read"
+    name: "Security OSV-Scanner Update"
+    uses: "./.github/workflows/security-osv-scanner-reusable.yml"
+    with:
+      sarif: true
+...

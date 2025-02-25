@@ -1,0 +1,25 @@
+# SPDX-FileCopyrightText: © 2024 nosludge <https://github.com/nosludge>
+# SPDX-FileContributor: szymonmaszke <github@maszke.co>
+#
+# SPDX-License-Identifier: Apache-2.0
+
+---
+blank_issues_enabled: "false"
+contact_links:
+  - name: "Security Issues"
+    about: "Check the security policy."
+  - name: "Question or Problem"
+    about: "Ask a question or report a problem in GitHub Discussions."
+    url: >
+      https://github.com/{{cookiecutter.repository_owner}}/{{cookiecutter.repository}}/discussions/categories/questions
+  - name: "Projects"
+    about: "Share projects built with {{cookiecutter.repository}}."
+    url: >
+      https://github.com/{{cookiecutter.repository_owner}}/{{cookiecutter.repository}}/discussions/categories/projects
+  - name: "Tips and Tricks"
+    about: >
+      Share useful code snippets, tips,
+      or resources related to {{cookiecutter.repository}}.
+    url: >
+      https://github.com/{{cookiecutter.repository_owner}}/{{cookiecutter.repository}}/discussions/categories/useful
+...

@@ -1,0 +1,62 @@
+# SPDX-FileCopyrightText: © 2024 nosludge <https://github.com/nosludge>
+# SPDX-FileContributor: szymonmaszke <github@maszke.co>
+#
+# SPDX-License-Identifier: Apache-2.0
+
+---
+name: "Prose Linter"
+
+on:
+  pull_request:
+    branches:
+      - "main"
+  merge_group:
+    types:
+      - "checks_requested"
+
+permissions: {} # yamllint disable-line rule:braces
+
+concurrency:
+  group: >
+    ${{ github.workflow_ref }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  prose-linter:
+    name: "Prose Linter"
+    permissions:
+      contents: "read"
+    timeout-minutes: 10
+    runs-on: "ubuntu-latest"
+    container:
+      # yamllint disable rule:line-length
+      image: "docker.io/jdkato/vale@sha256:a744bc4f8164bceab6bda0fad6253dcd9cdab2365b437aa5e08fe4f07d6e3357" # v3.8.0
+      # yamllint enable rule:line-length
+    steps:
+      - name: "Harden Runner"
+        # yamllint disable rule:line-length
+        uses: "step-security/harden-runner@17d0e2bd7d51742c71671bd19fa12bdc9d40a3d6" # v2.8.1
+        # yamllint enable rule:line-length
+        with:
+          egress-policy: "audit"
+      - name: "Checkout repository"
+        # yamllint disable rule:line-length
+        uses: "actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332" # v4.1.7
+        # yamllint enable rule:line-length
+        with:
+          persist-credentials: false
+          sparse-checkout: |
+            vale.ini
+            '**.md'
+            '**.py'
+            '**.sh'
+            '!LICENSE*'
+            '!DCO.md'
+          sparse-checkout-cone-mode: false
+      - name: "Sync Vale Packages"
+        run: >
+          /bin/vale sync
+      - name: "Prose Linter"
+        run: >
+          /bin/vale .
+...

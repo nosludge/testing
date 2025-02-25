@@ -1,0 +1,64 @@
+# SPDX-FileCopyrightText: © 2024 nosludge <https://github.com/nosludge>
+# SPDX-FileContributor: szymonmaszke <github@maszke.co>
+#
+# SPDX-License-Identifier: Apache-2.0
+
+---
+name: "Pull Request"
+
+on:
+  pull_request_target: # zizmor: ignore[dangerous-triggers]
+    types:
+      - "opened"
+      - "edited"
+      - "synchronize"
+      - "reopened"
+    branches:
+      - "main"
+  merge_group:
+    types:
+      - "checks_requested"
+
+permissions: {} # yamllint disable-line rule:braces
+
+concurrency:
+  group: >
+    ${{ github.workflow_ref }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pull-request:
+    timeout-minutes: 10
+    name: "Pull Request"
+    permissions:
+      pull-requests: "read"
+    runs-on: "ubuntu-latest"
+    steps:
+      - name: "Harden Runner"
+        # yamllint disable rule:line-length
+        uses: "step-security/harden-runner@5c7944e73c4c2a096b17a9cb74d65b6c2bbafbde" # v2.9.1
+        # yamllint enable rule:line-length
+        with:
+          disable-sudo: true
+          egress-policy: "block"
+          allowed-endpoints: >
+            api.github.com:443
+      - name: "Lint Pull Request"
+        # yamllint disable rule:line-length
+        uses: "amannn/action-semantic-pull-request@cfb60706e18bc85e8aec535e3c577abe8f70378e" # v5.5.2
+        # yamllint enable rule:line-length
+        with:
+          types: |
+            fix
+            feat
+          requireScope: false
+          disallowScopes: |
+            .+
+          subjectPattern: "^(?![A-Z]).+$"
+          subjectPatternError: |
+            The subject "{subject}" found in the pull request title "{title}"
+            didn't match the configured pattern. Please ensure that the subject
+            doesn't start with an uppercase character.
+        env:
+          GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+...

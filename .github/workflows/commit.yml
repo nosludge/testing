@@ -1,0 +1,69 @@
+# SPDX-FileCopyrightText: © 2024 nosludge <https://github.com/nosludge>
+# SPDX-FileContributor: szymonmaszke <github@maszke.co>
+#
+# SPDX-License-Identifier: Apache-2.0
+
+---
+name: "Commit"
+
+on:
+  pull_request:
+    branches:
+      - "main"
+  merge_group:
+    types:
+      - "checks_requested"
+
+permissions: {} # yamllint disable-line rule:braces
+
+concurrency:
+  group: >
+    ${{ github.workflow_ref }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  commit:
+    name: "Commit"
+    permissions:
+      contents: "read"
+    timeout-minutes: 10
+    runs-on: "ubuntu-latest"
+    steps:
+      - name: "Harden Runner"
+        # yamllint disable rule:line-length
+        uses: "step-security/harden-runner@5c7944e73c4c2a096b17a9cb74d65b6c2bbafbde" # v2.9.1
+        # yamllint enable rule:line-length
+        with:
+          disable-sudo: true
+          egress-policy: "block"
+          allowed-endpoints: >
+            api.github.com:443
+            files.pythonhosted.org:443
+            github.com:443
+            pdm-project.org:443
+            pdm.fming.dev:443
+            pypi.org:443
+            raw.githubusercontent.com:443
+      - name: "Checkout repository"
+        # yamllint disable rule:line-length
+        uses: "actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332" # v4.1.7
+        # yamllint enable rule:line-length
+        with:
+          sparse-checkout: |
+            README.md
+            LICENSE.md
+            .github/actions/pdm-setup
+            pyproject.toml
+            pdm.lock
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
+      - name: "Setup PDM"
+        uses: "./.github/actions/pdm-setup"
+        with:
+          pdm-install: "-G commit --no-self" # conventional-pre-commit
+      - name: "Run Commit Linter"
+        env:
+          LAST_COMMIT: "${{ github.event.head_commit.message }}"
+        run: >
+          pdm run check-commit <<< "${LAST_COMMIT}"
+...

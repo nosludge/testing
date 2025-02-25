@@ -1,0 +1,45 @@
+# SPDX-FileCopyrightText: © 2024 nosludge <https://github.com/nosludge>
+# SPDX-FileContributor: szymonmaszke <github@maszke.co>
+#
+# SPDX-License-Identifier: Apache-2.0
+
+---
+name: "Files Decode"
+description: >
+  Decode files and store the result decode var in $GITHUB_OUTPUT
+
+inputs:
+  encoded:
+    description: "A base64 encoded string"
+    required: true
+
+outputs:
+  decoded:
+    description: "Decoded base64 string"
+    value: "${{ steps.decode.outputs.decoded }}"
+
+runs:
+  using: "composite"
+  steps:
+    - name: "Files Decode"
+      id: "decode"
+      shell: "bash"
+      env:
+        ENCODED: "${{ inputs.encoded }}"
+      # yamllint disable rule:indentation
+      run: |
+        set -uo pipefail
+
+        # shellcheck disable=SC2086
+        SHA256=$(shasum -a 256 $GLOB 2>/dev/null)
+        if test "${RUNNER_OS}" = "macOS"
+        then
+          # Echo SHA256 to base64 and store in GITHUB_OUTPUT under name hash=
+          DECODED=$(echo "${ENCODED}" | base64 --decode)
+        else
+          DECODED=$(echo "${ENCODED}" | base64 --decode -w 0)
+        fi
+
+        echo "decoded=${DECODED}" >> "${GITHUB_OUTPUT}"
+      # yamllint enable rule:indentation
+...

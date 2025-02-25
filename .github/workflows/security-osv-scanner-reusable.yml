@@ -1,0 +1,76 @@
+# SPDX-FileCopyrightText: © 2024 nosludge <https://github.com/nosludge>
+# SPDX-FileContributor: szymonmaszke <github@maszke.co>
+#
+# SPDX-License-Identifier: Apache-2.0
+
+---
+name: "Security OSV-Scanner Reusable"
+
+on:
+  workflow_call:
+    inputs:
+      name:
+        description: "Name of the artifact (default: '' - no artifact upload)"
+        type: "string"
+        default: ""
+      sarif:
+        description: "Upload SARIF file to CodeQL"
+        type: "boolean"
+        default: false
+      continue-on-error:
+        description: "Whether to continue on error"
+        type: "boolean"
+        default: false
+      file:
+        description: "Name/path of the created SARIF file"
+        type: "string"
+        default: "osv-scanner.sarif"
+
+permissions: {} # yamllint disable-line rule:braces
+
+jobs:
+  security-osv-scanner-reusable:
+    name: "Security OSV-Scanner Reusable"
+    runs-on: "ubuntu-latest"
+    permissions:
+      # Required to upload SARIF file to CodeQL.
+      # See: https://github.com/github/codeql-action/issues/2117
+      actions: "read"
+      # Writing security events to upload SARIF file to security tab
+      security-events: "write"
+      # Only need to read contents
+      contents: "read"
+    steps:
+      - name: "Harden Runner"
+        # yamllint disable rule:line-length
+        uses: "step-security/harden-runner@17d0e2bd7d51742c71671bd19fa12bdc9d40a3d6" # v2.8.1
+        # yamllint enable rule:line-length
+        with:
+          egress-policy: "audit"
+      - name: "Checkout repository"
+        # yamllint disable rule:line-length
+        uses: "actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332" # v4.1.7
+        # yamllint enable rule:line-length
+        with:
+          persist-credentials: false
+      - name: "Run scanner"
+        # yamllint disable rule:line-length
+        uses: "google/osv-scanner/actions/scanner@1e295ee11c5e107886e58bacb04228325082146f" # v1.9.2
+        # yamllint enable rule:line-length
+        continue-on-error: ${{ inputs.continue-on-error }}
+        with:
+          scan-args: |
+            --format=sarif
+            --output=${{ inputs.file }}
+            --format=json
+            --recursive
+            --skip-git
+            --experimental-licenses=MIT,Apache-2.0,BSD-2-Clause,BSD-3-Clause,Unlicense,Zlib,OFL-1.1,0BSD,PSF-2.0
+            ./
+      - name: "Upload files"
+        uses: "./.github/actions/sarif-upload"
+        with:
+          file: "${{ inputs.file }}"
+          name: "${{ inputs.name }}"
+          sarif: "${{ inputs.sarif }}"
+...

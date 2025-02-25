@@ -1,0 +1,63 @@
+# SPDX-FileCopyrightText: © 2024 nosludge <https://github.com/nosludge>
+# SPDX-FileContributor: szymonmaszke <github@maszke.co>
+#
+# SPDX-License-Identifier: Apache-2.0
+
+---
+name: "Policy"
+
+on:
+  pull_request:
+    branches:
+      - "main"
+  merge_group:
+    types:
+      - "checks_requested"
+
+permissions: {} # yamllint disable-line rule:braces
+
+concurrency:
+  group: >
+    ${{ github.workflow_ref }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pr-policy-enforcer:
+    timeout-minutes: 10
+    name: "Policy"
+    # Renovate bot disabled as it is not signing the commit
+    if: >
+      github.event.pull_request.user.login != 'renovate[bot]'
+    permissions:
+      contents: "read"
+    runs-on: "ubuntu-latest"
+    steps:
+      - name: "Harden Runner"
+        # yamllint disable rule:line-length
+        uses: "step-security/harden-runner@17d0e2bd7d51742c71671bd19fa12bdc9d40a3d6" # v2.8.1
+        # yamllint enable rule:line-length
+        with:
+          sudo: "disable"
+          egress-policy: "block"
+          allowed-endpoints: >
+            api.github.com:443
+            github.com:443
+      - name: "Checkout Repository"
+        # yamllint disable rule:line-length
+        uses: "actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332" # v4.1.7
+        # yamllint enable rule:line-length
+        with:
+          sparse-checkout: |
+            .conform.yaml
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
+          # Necessary for the conform action to work (commit ranges)
+          # See here: https://github.com/siderolabs/conform/issues/231
+          fetch-depth: 2
+      - name: "Check policy compliance"
+        # yamllint disable rule:line-length
+        uses: "siderolabs/conform@43d9fb6d85d5f01b391245805eefd258db160197" # v0.1.0-alpha.30
+        # yamllint enable rule:line-length
+        with:
+          token: "${{ secrets.GITHUB_TOKEN }}"
+...

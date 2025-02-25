@@ -1,0 +1,89 @@
+# SPDX-FileCopyrightText: © 2024 nosludge <https://github.com/nosludge>
+# SPDX-FileContributor: szymonmaszke <github@maszke.co>
+#
+# SPDX-License-Identifier: Apache-2.0
+
+---
+name: "Cache Item Reusable"
+
+on:
+  workflow_call:
+    inputs:
+      pdm-install:
+        description: "Flags used for PDM installation"
+        type: "string"
+        required: true
+      python-version:
+        description: "Python version used for caching"
+        type: "string"
+        #
+        #           DO NOT EDIT UNTIL end marker
+        #
+        # [[[cog
+        # import cog
+        # import cogeol
+        #
+        # cycle = cogeol.scientific()[-1]["cycle"]
+        # cog.out(f"        default: '{cycle}'")
+        # ]]]
+        default: "3.11"
+        # [[[end]]]
+      os:
+        description: "Operating system to cache on"
+        type: "string"
+        default: "ubuntu-latest"
+
+permissions: {} # yamllint disable-line rule:braces
+
+jobs:
+  cache-item-reusable:
+    name: >
+      Cache | ${{ inputs.pdm-install }} |
+      python-${{ inputs.python-version }} |
+      ${{ inputs.os }}
+    runs-on: "${{ inputs.os }}"
+    timeout-minutes: 30
+    permissions:
+      contents: "read"
+    defaults:
+      run:
+        shell: "bash"
+    steps:
+      - name: "Harden Runner"
+        # yamllint disable rule:line-length
+        uses: "step-security/harden-runner@17d0e2bd7d51742c71671bd19fa12bdc9d40a3d6" # v2.8.1
+        # yamllint enable rule:line-length
+        with:
+          disable-sudo: true
+          egress-policy: "block"
+          allowed-endpoints: >
+            api.github.com:443
+            files.pythonhosted.org:443
+            github.com:443
+            pdm-project.org:443
+            pdm.fming.dev:443
+            pypi.org:443
+            raw.githubusercontent.com:443
+      - name: "Checkout repository"
+        # yamllint disable rule:line-length
+        uses: "actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332" # v4.1.7
+        # yamllint enable rule:line-length
+        with:
+          sparse-checkout: |
+            README.md
+            LICENSE.md
+            .github/actions/pdm-setup
+            __pypackages__
+            pyproject.toml
+            pdm.lock
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
+          # Checkout `main` as otherwise the files may not be available
+          # after initial template usage
+          ref: "main"
+      - name: "Setup PDM and cache"
+        uses: "./.github/actions/pdm-setup"
+        with:
+          pdm-install: "${{ inputs.pdm-install }}"
+          python-version: "${{ inputs.python-version }}"
+...

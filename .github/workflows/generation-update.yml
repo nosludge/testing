@@ -1,0 +1,85 @@
+# SPDX-FileCopyrightText: © 2024 nosludge <https://github.com/nosludge>
+# SPDX-FileContributor: szymonmaszke <github@maszke.co>
+#
+# SPDX-License-Identifier: Apache-2.0
+
+---
+name: "Generation Update"
+
+on:
+  schedule:
+    - cron: "0 3 * * 6"
+  workflow_dispatch:
+
+permissions: {} # yamllint disable-line rule:braces
+
+# Make it into a shared action ran on PR as well
+# Conclusion^
+# Should it be run locally at all? Maybe schedule only?
+# Not schedule only, it should be painful to disregard its effects,
+# check on every PR as well
+concurrency:
+  group: >
+    ${{ github.workflow_ref }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  generation-update:
+    timeout-minutes: 10
+    name: "Generation Update"
+    permissions:
+      contents: "read"
+      pull-requests: "write"
+    runs-on: "ubuntu-latest"
+    steps:
+      - name: "Harden Runner"
+        # yamllint disable rule:line-length
+        uses: "step-security/harden-runner@17d0e2bd7d51742c71671bd19fa12bdc9d40a3d6" # v2.8.1
+        # yamllint enable rule:line-length
+        with:
+          disable-sudo: true
+          egress-policy: "block"
+          allowed-endpoints: >
+            api.github.com:443
+            files.pythonhosted.org:443
+            github.com:443
+            pdm-project.org:443
+            pdm.fming.dev:443
+            pypi.org:443
+            raw.githubusercontent.com:443
+      - name: "Checkout repository" # zizmor: ignore[artipacked]
+        # yamllint disable rule:line-length
+        uses: "actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332" # v4.1.7
+        # yamllint enable rule:line-length
+      - name: "Setup PDM"
+        uses: "./.github/actions/pdm-setup"
+        with:
+          pdm-install: "-G generation --no-self" # static generation
+      - name: "Setup git credentials"
+        uses: "./.github/actions/git-setup"
+      - name: "Create new branch"
+        env:
+          BRANCH_NAME: "bot/generation-update/${{ github.run_id }}"
+        run: >
+          git checkout -b "${BRANCH_NAME}"
+      - name: "Update generation"
+        run: >
+          pdm run fix-generation
+      - name: "Check changes"
+        id: "check-changes"
+        # yamllint disable rule:indentation
+        run: |
+          if git diff --exit-code; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          fi
+        # yamllint enable rule:indentation
+      - name: "Push changes"
+        if: >
+          steps.check-changes.outputs.changed == 'true'
+        uses: "./.github/actions/pull-request"
+        with:
+          commit-message: "update pre-commit dependencies"
+          branch-name: "bot/generation-update/${{ github.run_id }}"
+...

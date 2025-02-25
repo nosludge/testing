@@ -1,0 +1,23 @@
+# SPDX-FileCopyrightText: © 2024 nosludge <https://github.com/nosludge>
+# SPDX-FileContributor: szymonmaszke <github@maszke.co>
+#
+# SPDX-License-Identifier: Apache-2.0
+
+---
+name: "SBOM Upload"
+description: >
+  Predefined SBOM upload including GitHub SHAs and proper identifiers
+
+runs:
+  using: "composite"
+  steps:
+    - name: "Upload SBOM artifact"
+      # yamllint disable rule:line-length
+      uses: "actions/upload-artifact@834a144ee995460fba8ed112a2fc961b36a5ec5a" # v4.3.6
+      # yamllint enable rule:line-length
+      with:
+        name: "${{ env.identifier }}"
+        path: "${{ env.identifier }}-${{ github.sha }}.json"
+        retention-days: "${{ env.retention-days }}"
+        overwrite: true
+...

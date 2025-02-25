@@ -1,0 +1,86 @@
+# SPDX-FileCopyrightText: © 2024 nosludge <https://github.com/nosludge>
+# SPDX-FileContributor: szymonmaszke <github@maszke.co>
+#
+# SPDX-License-Identifier: Apache-2.0
+
+---
+name: "Coverage Reusable"
+
+on:
+  workflow_call:
+    inputs:
+      upload-to-release:
+        description: "Whether should upload data to release"
+        type: "boolean"
+        default: false
+      retention-days:
+        description: "Number of days to keep the artifact"
+        type: "number"
+        default: 5
+      timeout-minutes:
+        description: "Maximum time for the job to run"
+        type: "number"
+        default: 180
+
+permissions: {} # yamllint disable-line rule:braces
+
+jobs:
+  coverage-reusable:
+    name: "Coverage Reusable"
+    runs-on: "ubuntu-latest"
+    timeout-minutes: "${{ inputs.timeout-minutes }}"
+    permissions:
+      contents: "read"
+    steps:
+      - name: "Harden Runner"
+        # yamllint disable rule:line-length
+        uses: "step-security/harden-runner@17d0e2bd7d51742c71671bd19fa12bdc9d40a3d6" # v2.8.1
+        # yamllint enable rule:line-length
+        with:
+          disable-sudo: true
+          egress-policy: "block"
+          allowed-endpoints: >
+            api.github.com:443
+            files.pythonhosted.org:443
+            github.com:443
+            pdm-project.org:443
+            pdm.fming.dev:443
+            pypi.org:443
+            raw.githubusercontent.com:443
+      - name: "Checkout repository"
+        # yamllint disable rule:line-length
+        uses: "actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332" # v4.1.7
+        # yamllint enable rule:line-length
+        with:
+          sparse-checkout: |
+            README.md
+            LICENSE.md
+            .github/actions/pdm-setup
+            pyproject.toml
+            pdm.lock
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
+      - name: "Setup PDM"
+        uses: "./.github/actions/pdm-setup"
+        with:
+          pdm-install: "-G dev-test --no-self"
+      - name: "Download coverage data."
+        # yamllint disable rule:line-length
+        uses: "actions/download-artifact@65a9edc5881444af0b9093a5e628f2fe47ea3b2e" # v4.1.7
+        # yamllint enable rule:line-length
+        with:
+          pattern: "python-coverage-*-${{ github.sha }}"
+      - name: "Combine coverage & create HTML report"
+        shell: "bash"
+        run: |
+          pdm run coverage combine --keep "$(find . -type f -name ".coverage*")"
+          pdm run coverage html --skip-empty
+          pdm run coverage report
+      - name: "Upload HTML report"
+        # yamllint disable rule:line-length
+        uses: "actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808" # v4.3.3
+        # yamllint enable rule:line-length
+        with:
+          name: "python-combined-coverage-${{ github.sha }}"
+          path: "htmlcov"
+...

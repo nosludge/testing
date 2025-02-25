@@ -1,0 +1,86 @@
+# SPDX-FileCopyrightText: © 2024 nosludge <https://github.com/nosludge>
+# SPDX-FileContributor: szymonmaszke <github@maszke.co>
+#
+# SPDX-License-Identifier: Apache-2.0
+
+---
+name: "Security Scorecard Reusable"
+
+on:
+  workflow_call:
+    inputs:
+      name:
+        description: "Name of the artifact (default: '' - no artifact upload)"
+        type: "string"
+        default: ""
+      sarif:
+        description: "Upload SARIF file to CodeQL"
+        type: "boolean"
+        default: false
+      continue-on-error:
+        description: >
+          Whether to continue on error (unused, compatibility for release.yml)
+        type: "boolean"
+        default: true
+      file:
+        description: "Name/path of the created SARIF file"
+        type: "string"
+        default: "scorecard.sarif"
+
+permissions: {} # yamllint disable-line rule:braces
+
+jobs:
+  security-scorecard-reusable:
+    name: "Security Scorecard Reusable"
+    timeout-minutes: 10
+    runs-on: "ubuntu-latest"
+    permissions:
+      # Required to upload SARIF file to CodeQL.
+      # See: https://github.com/github/codeql-action/issues/2117
+      actions: "read"
+      # Writing security events to upload SARIF file to security tab
+      security-events: "write"
+      # Only need to read contents
+      contents: "read"
+    steps:
+      - name: "Harden Runner"
+        # yamllint disable rule:line-length
+        uses: "step-security/harden-runner@17d0e2bd7d51742c71671bd19fa12bdc9d40a3d6" # v2.8.1
+        # yamllint enable rule:line-length
+        with:
+          egress-policy: "audit"
+      - name: "Checkout repository"
+        # yamllint disable rule:line-length
+        uses: "actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332" # v4.1.7
+        # yamllint enable rule:line-length
+        with:
+          persist-credentials: false
+      - name: "Run analysis"
+        # yamllint disable rule:line-length
+        uses: "ossf/scorecard-action@0864cf19026789058feabb7e87baa5f140aac736" # v2.3.1
+        with:
+          results_file: "${{ inputs.file }}"
+          results_format: "sarif"
+          # (Optional) "write" PAT token. Uncomment the `repo_token` line below if:
+          # - you want to enable the Branch-Protection check on a *public* repository, or
+          # - you are installing Scorecard on a *private* repository
+          # To create the PAT, follow the steps in
+          # https://github.com/ossf/scorecard-action?tab=readme-ov-file#authentication-with-fine-grained-pat-optional
+          # repo_token: ${{ secrets.SCORECARD_TOKEN }}
+
+          # Public repositories:
+          #   - Publish results to OpenSSF REST API for easy access by consumers
+          #   - Allows the repository to include the Scorecard badge.
+          #   - See https://github.com/ossf/scorecard-action#publishing-results.
+          # For private repositories:
+          #   - `publish_results` will always be set to `false`, regardless
+          #     of the value entered here.
+          publish_results: "${{ inputs.sarif }}"
+          # yamllint enable rule:line-length
+      - name: "Upload files"
+        uses: "./.github/actions/sarif-upload"
+        with:
+          file: "${{ inputs.file }}"
+          name: "${{ inputs.name }}"
+          sarif: "${{ inputs.sarif }}"
+...
